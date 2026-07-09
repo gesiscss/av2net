@@ -1,0 +1,55 @@
+{
+  "layer": 1,
+  "source_id": "bafyreia3hdtlonrfr2bq7qxeytljm5l7rcitbcy7sswywhvacnitqsqywi",
+  "video": "bafyreia3hdtlonrfr2bq7qxeytljm5l7rcitbcy7sswywhvacnitqsqywi.mp4",
+  "observations": 12,
+  "elapsed_seconds": 947.7,
+  "detection": {
+    "speech_language": "de",
+    "speech_language_confidence": 0.9985806941986084,
+    "ocr_language_detected": "de",
+    "ocr_language_confidence": 1.0,
+    "ocr_model_lang": "paddleocr:de@3.7.0",
+    "vision_caption_language": "de"
+  },
+  "config": {
+    "mode": "local",
+    "speech": {
+      "backend": "faster-whisper",
+      "model_size": "base",
+      "compute_type": "int8",
+      "device": "cpu",
+      "beam_size": 5,
+      "language": null
+    },
+    "ocr": {
+      "backend": "paddleocr",
+      "min_confidence": 0.5,
+      "language": "auto",
+      "bootstrap_lang": "en"
+    },
+    "vision": {
+      "backend": "ollama",
+      "model": "moondream",
+      "host": null,
+      "temperature": 0.0,
+      "caption_language": "auto",
+      "prompt": "Describe what is visible in this single video frame in one or two sentences. Mention people, objects, on-screen text, and setting. Do not speculate about audio or about what happens before or after."
+    },
+    "observation": {
+      "window_seconds": 5.0,
+      "frame_position": "mid",
+      "max_duration_s": 60.0,
+      "jpeg_quality": 90
+    }
+  },
+  "library_versions": {
+    "faster-whisper": "1.2.1",
+    "paddleocr": "3.7.0",
+    "paddlepaddle": "3.3.1",
+    "langdetect": "1.0.9",
+    "ollama": "0.6.2",
+    "opencv": "4.10.0.84",
+    "pydantic": "2.13.4"
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "layer": 1,
+  "step": "vision",
+  "source_id": "bafyreia3hdtlonrfr2bq7qxeytljm5l7rcitbcy7sswywhvacnitqsqywi",
+  "caption_language": "de",
+  "vision_model": "ollama:moondream@client0.6.2",
+  "n_shots": 22,
+  "n_units": 20,
+  "shot_threshold": 27.0,
+  "min_shot_seconds": 0.6,
+  "elapsed_seconds": 513.9,
+  "config": {
+    "mode": "local",
+    "speech": {
+      "backend": "faster-whisper",
+      "model_size": "base",
+      "compute_type": "int8",
+      "device": "cpu",
+      "beam_size": 5,
+      "language": null
+    },
+    "ocr": {
+      "backend": "rapidocr-onnx",
+      "min_confidence": 0.5,
+      "language": "auto",
+      "sample_dt": 0.5,
+      "change_threshold": 4.0,
+      "text_similarity_min": 0.65,
+      "y_overlap_min": 0.3,
+      "gap_factor": 1.6
+    },
+    "vision": {
+      "backend": "ollama",
+      "model": "moondream",
+      "host": null,
+      "temperature": 0.0,
+      "caption_language": "auto",
+      "shot_threshold": 27.0,
+      "min_shot_seconds": 0.6,
+      "prompt": "Describe the visual scene in this single video frame in one or two sentences: the people present and what they are doing, notable objects, and the setting or location. Do not read, transcribe, or mention any on-screen text, captions, or logos (a separate system handles text). Do not speculate about audio or about what happens before or after."
+    },
+    "observation": {
+      "frame_position": "mid",
+      "max_duration_s": null,
+      "jpeg_quality": 90
+    },
+    "time": {
+      "anchor": null
+    }
+  },
+  "library_versions": {
+    "scenedetect": "0.7",
+    "ollama": "0.6.2",
+    "opencv": "4.10.0.84",
+    "pydantic": "2.13.4"
+  }
+}

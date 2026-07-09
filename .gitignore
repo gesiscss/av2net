@@ -1,0 +1,25 @@
+# Observation source inputs (large binaries, transient per PROJECT.md; retrievable by CID)
+input/
+*.mp4
+
+# Pipeline outputs (regenerable from inputs; not part of the shared repo)
+output/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.ipynb_checkpoints/
+.pytest_cache/
+.venv/
+
+# Claude Code (local agent config, not part of the shared repo)
+.claude/
+
+# Project/agent instructions (kept out of the shared repo)
+CLAUDE.md
+PROJECT.md
+
+# OS / editor
+.DS_Store
+Thumbs.db
