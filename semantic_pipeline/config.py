@@ -62,6 +62,49 @@ class ObservationConfig:
 
 
 @dataclass(frozen=True)
+class LLMConfig:
+    """A shared instruction-tuned LLM engine (the resource axis of Layer 2).
+
+    One engine is built once per run and shared by every extractor that needs an
+    LLM. Local mode uses a small instruction-tuned model served by Ollama;
+    production swaps the model (and, if needed, the backend) here, never in the
+    extractor logic.
+    """
+
+    backend: str = "ollama"
+    model: str = "qwen2.5:3b"       # small instruction-tuned LM, local via Ollama
+    host: str | None = None         # None = default local Ollama server
+    temperature: float = 0.0        # 0 + fixed seed for as-deterministic-as-possible
+    seed: int = 0
+    num_ctx: int = 4096
+
+
+@dataclass(frozen=True)
+class NERConfig:
+    """The entity extractor (the first semantic extractor)."""
+
+    enabled: bool = True
+    engine: str = "llm"             # which engine (resource) this extractor uses
+    # Entity types the model is asked to tag (guidance only; the model may still
+    # return others). Person names must come from text, never from vision.
+    entity_types: tuple[str, ...] = ("PERSON", "ORG", "LOC", "GPE", "MISC")
+    # Speech/OCR overlap: burned-in subtitles duplicate spoken text. OCR units in
+    # these regions that duplicate an overlapping speech unit are dropped before
+    # extraction so the same utterance is not read twice (entity-level dedup).
+    subtitle_regions: tuple[str, ...] = ("lower", "bottom")
+    dedup_similarity_min: float = 0.8   # subtitle<->speech text similarity to drop
+    dedup_time_tolerance_s: float = 1.0  # time slack when matching subtitle to speech
+
+
+@dataclass(frozen=True)
+class ExtractionConfig:
+    """Layer 2 configuration: shared engines + per-extractor settings."""
+
+    llm: LLMConfig = field(default_factory=LLMConfig)
+    ner: NERConfig = field(default_factory=NERConfig)
+
+
+@dataclass(frozen=True)
 class TimeConfig:
     """Absolute time base. `anchor` is a timezone-aware ISO 8601 instant marking
     offset 0. Default None = zero origin, so timestamps are pure offsets from 0
@@ -81,6 +124,7 @@ class Config:
     ocr: OCRConfig = field(default_factory=OCRConfig)
     vision: VisionConfig = field(default_factory=VisionConfig)
     observation: ObservationConfig = field(default_factory=ObservationConfig)
+    extraction: ExtractionConfig = field(default_factory=ExtractionConfig)
     time: TimeConfig = field(default_factory=TimeConfig)
 
     @staticmethod

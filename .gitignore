@@ -2,8 +2,9 @@
 input/
 *.mp4
 
-# Pipeline outputs (regenerable from inputs; not part of the shared repo)
-output/
+# Per-video pipeline data (observations, events, run manifests): regenerable from
+# inputs, video-specific, not part of the shared repo. One subdir per source_id.
+data/
 
 # Python
 __pycache__/
