@@ -105,6 +105,31 @@ class ExtractionConfig:
 
 
 @dataclass(frozen=True)
+class NetworkConfig:
+    """Layer 3 (temporal network construction).
+
+    Co-occurrence is grounded in the observation structure, never a tunable time
+    window (temporal proximity is a Layer 4 analysis concern). Three structural
+    sources can be toggled independently.
+    """
+
+    co_occurrence_same_segment: bool = True  # entities in one observation unit
+    co_occurrence_overlap: bool = True       # source segments overlap in time
+    co_occurrence_scene: bool = True         # entities within one vision shot (clique)
+    casefold: bool = True                    # identifier normalization: casefold
+    emit_appearances: bool = True            # unary "appears" interactions
+    # Alias resolution (Layer 3, descriptive): merge surface-form variants of the
+    # same entity. Exact-normalized merge is always on; fuzzy adds edit-distance
+    # merging, gated by type so it never merges across incompatible categories.
+    resolve_fuzzy: bool = True
+    fuzzy_threshold: float = 0.90            # min SequenceMatcher ratio to merge
+    fuzzy_min_length: int = 4                # shorter keys must match exactly (protects "A2")
+    # Categories allowed to merge across (besides identical type). MISC merges
+    # only with MISC; PERSON/ORG/... never cross.
+    type_merge_groups: tuple[tuple[str, ...], ...] = (("LOC", "GPE"),)
+
+
+@dataclass(frozen=True)
 class TimeConfig:
     """Absolute time base. `anchor` is a timezone-aware ISO 8601 instant marking
     offset 0. Default None = zero origin, so timestamps are pure offsets from 0
@@ -125,6 +150,7 @@ class Config:
     vision: VisionConfig = field(default_factory=VisionConfig)
     observation: ObservationConfig = field(default_factory=ObservationConfig)
     extraction: ExtractionConfig = field(default_factory=ExtractionConfig)
+    network: NetworkConfig = field(default_factory=NetworkConfig)
     time: TimeConfig = field(default_factory=TimeConfig)
 
     @staticmethod

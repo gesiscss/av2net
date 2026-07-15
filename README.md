@@ -15,7 +15,7 @@ Four layers, communicating only through immutable, serialized objects
 |-------|------|----------------|--------|
 | 1 | Observation | MP4 -> `Observation` objects | done |
 | 2 | Semantic extraction | `Observation` -> `SemanticEvent` objects | in progress (NER) |
-| 3 | Network construction | `SemanticEvent` -> `TemporalInteraction` stream | planned |
+| 3 | Network construction | `SemanticEvent` -> `TemporalInteraction` stream + `CanonicalNetwork` | done (entities) |
 | 4 | Network analysis | analysis over the canonical network | planned |
 
 Two execution modes share one architecture: **local development** (CPU/consumer
@@ -47,16 +47,46 @@ Transforms observations into a stream of `SemanticEvent`s. Two axes kept separat
 NER draws entities from text (speech + OCR) only, never from vision, and drops
 burned-in subtitles that duplicate speech. Run script: [run_ner.py](run_ner.py).
 
+## Layer 3 (Network construction)
+
+Turns the event stream into two representations:
+
+- **Streaming representation** (`temporal_interactions.jsonl`) - the authoritative,
+  append-only record in Holme form `(time, source, relation, target, attributes)`.
+- **Canonical network** (`canonical_network.json`) - a derived multipartite graph,
+  always rebuildable from the stream alone.
+
+This layer is descriptive (identifier normalization, alias resolution, edge
+aggregation); no graph analytics and no MP4 access (those belong to Layer 4).
+Alias resolution merges surface-form variants of one entity: exact-normalized
+always, plus optional fuzzy (edit-distance) merging that is type-gated (never
+across incompatible categories) and length-guarded (short strings match exactly),
+clustered deterministically. Deciding two *different* names co-refer
+(`Katharina` = `Frau Reiche`) is coreference/entity-linking, an upstream Layer 2
+inference, not done here.
+Co-occurrence is grounded in the observation structure, never a tunable time
+window: `same_segment` (one observation unit), `overlap` (source segments overlap
+in time), and `same_scene` (a clique within one vision shot; shot intervals are
+read from the Layer 1 vision observations). Each co-occurrence also records the
+set of observation channels it draws on (a single channel like `speech` or a
+combination like `ocr+speech`), aggregated per edge as `by_channel`; the channel
+is derived from the originating observation's modality, so channels beyond
+speech/OCR flow through unchanged. Run script: [run_network.py](run_network.py).
+An optional `to_networkx()` adapter loads the canonical network for analysis
+without making `networkx` a core dependency.
+
 ## Package layout
 
 ```
 semantic_pipeline/
   config.py, io.py, language.py, time_base.py, source.py
-  models/              immutable data objects (Observation, SemanticEvent, ...)
+  models/              immutable data objects (Observation, SemanticEvent,
+                       TemporalInteraction, CanonicalNetwork)
   layer1_observation/  interfaces + local backends + streaming/segmentation
   layer2_extraction/   interfaces, context, memory, pipeline, factory
     extractors/        semantic axis (entities, ...)
     engines/           resource axis (shared LLM, ...)
+  layer3_network/      normalize, scenes, stream, canonical, build, adapters
 ```
 
 ## Data
@@ -73,7 +103,9 @@ data/<source_id>/
   source.json                    source metadata + time anchor
   observations.{speech,ocr,vision}.jsonl
   semantic_events.jsonl          Layer 2 entity events
-  run_manifest.{speech,ocr,vision,ner}.json
+  temporal_interactions.jsonl    Layer 3 authoritative interaction stream
+  canonical_network.json         Layer 3 derived network (rebuildable from the stream)
+  run_manifest.{speech,ocr,vision,ner,network}.json
 ```
 
 The tracked, non-video-specific record of how to reproduce a run is the code plus

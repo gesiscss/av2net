@@ -54,6 +54,17 @@ def discover_run_dirs(datadir: str | Path) -> list[Path]:
     )
 
 
+def discover_event_dirs(datadir: str | Path) -> list[Path]:
+    """Per-video directories under datadir that hold a semantic event stream."""
+    base = Path(datadir)
+    if not base.exists():
+        return []
+    return sorted(
+        d for d in base.iterdir()
+        if d.is_dir() and (d / "semantic_events.jsonl").exists()
+    )
+
+
 def pkg(name: str) -> str:
     try:
         return version(name)

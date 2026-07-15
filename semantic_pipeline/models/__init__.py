@@ -5,11 +5,13 @@ one per layer boundary, right before the layer that produces it:
 
     Observation family   Layer 1 output   (observation.py)
     SemanticEvent        Layer 2 output   (event.py)
-    TemporalInteraction  Layer 3 output   (added with Layer 3)
-    CanonicalNetwork     Layer 3 derived  (added with Layer 3)
+    TemporalInteraction  Layer 3 output   (interaction.py)
+    CanonicalNetwork     Layer 3 derived  (network.py)
 """
 
 from .event import Node, Relation, SemanticEvent
+from .interaction import TemporalInteraction
+from .network import CanonicalEdge, CanonicalNetwork, CanonicalNode
 from .observation import (
     Observation,
     OCRLine,
@@ -29,4 +31,8 @@ __all__ = [
     "SemanticEvent",
     "Node",
     "Relation",
+    "TemporalInteraction",
+    "CanonicalNetwork",
+    "CanonicalNode",
+    "CanonicalEdge",
 ]
