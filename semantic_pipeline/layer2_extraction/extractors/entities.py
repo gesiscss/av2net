@@ -87,13 +87,14 @@ class EntityExtractor(SemanticExtractor):
 
         return [
             SemanticEvent(
-                event_id=f"{span.observation_id}:{self.name}",
+                event_id=f"{span.span_id}:{self.name}",
                 source_id=span.source_id,
                 extractor=self.name,
                 model=self._engine.model_id,
                 t_start=span.t_start,
                 t_end=span.t_end,
-                observation_refs=(span.observation_id,),
+                observation_refs=span.observation_refs or (span.observation_id,),
+                channel=span.channel,
                 confidence=None,  # the model gives no calibrated score
                 nodes=tuple(nodes),
             )

@@ -45,9 +45,13 @@ def _id_modality(identifier: str) -> str | None:
 
 
 def _event_channels(event: SemanticEvent) -> frozenset[str]:
-    """Observation channel(s) an event was extracted from, derived from its
-    observation ids' modality (falls back to the event id). Modality-agnostic, so
-    any channel (speech, ocr, vision, ...) flows through without special-casing."""
+    """Channel(s) an event was extracted from: its explicit `channel` if set
+    (subtitle-corrected speech draws on OCR observations but is still speech),
+    else derived from its observation ids' modality (falling back to the event
+    id). Modality-agnostic, so any channel (speech, ocr, vision, ...) flows
+    through without special-casing."""
+    if event.channel:
+        return frozenset({event.channel})
     chans = {m for ref in event.observation_refs if (m := _id_modality(ref))}
     if not chans:
         m = _id_modality(event.event_id)

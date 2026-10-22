@@ -37,15 +37,30 @@ manifest into the video's data directory (see Data below).
 
 ## Layer 2 (Semantic extraction)
 
-Transforms observations into a stream of `SemanticEvent`s. Two axes kept separate:
+Transforms observations into a stream of `SemanticEvent`s, in two steps.
+
+**Text assembly** ([run_text.py](run_text.py)) builds the one text stream that
+every text extractor reads. Burned-in subtitles are found from the evidence in
+each video, with no screen region assumed: a layout cluster of OCR lines that,
+as a group, renders much of the speech at a stable time offset. Their readings
+are merged word by word into the speech transcript. Subtitles fix misheard words,
+add missed ones and carry quotation marks (reported speech, for quote
+attribution); the transcript fixes OCR misreadings and missing spaces; each
+utterance is read once. Multi-line subtitle blocks are read as one text.
+Disagreements are settled by ordered rules (spacing, a real-word check against a
+per-language word list, majority over OCR reads, ties to the subtitle). Other
+on-screen text (headlines, banners, credits) stays its own channel. Every decision is kept in `text_stream.jsonl` for audit;
+the stream is derived and rebuildable from the observations.
+
+**Extraction** keeps two axes separate:
 
 - **extractors** (semantic axis) - one module per semantic dimension. Entities
   (NER) is the first; relations, sentiment, etc. are added as new modules.
 - **engines** (resource axis) - one wrapper per model/package, built once and
   shared. Local NER uses a small instruction-tuned LLM via Ollama (`qwen2.5:3b`).
 
-NER draws entities from text (speech + OCR) only, never from vision, and drops
-burned-in subtitles that duplicate speech. Run script: [run_ner.py](run_ner.py).
+NER draws entities from the text stream (speech + on-screen text) only, never
+from vision. Run script: [run_ner.py](run_ner.py).
 
 ## Layer 3 (Network construction)
 
@@ -69,9 +84,11 @@ window: `same_segment` (one observation unit), `overlap` (source segments overla
 in time), and `same_scene` (a clique within one vision shot; shot intervals are
 read from the Layer 1 vision observations). Each co-occurrence also records the
 set of observation channels it draws on (a single channel like `speech` or a
-combination like `ocr+speech`), aggregated per edge as `by_channel`; the channel
-is derived from the originating observation's modality, so channels beyond
-speech/OCR flow through unchanged. Run script: [run_network.py](run_network.py).
+combination like `ocr+speech`), aggregated per edge as `by_channel`. Each event
+carries its channel explicitly (subtitle-corrected speech counts as speech,
+independent on-screen text as `ocr`); events without one fall back to the
+originating observation's modality, so channels beyond speech/OCR flow through
+unchanged. Run script: [run_network.py](run_network.py).
 An optional `to_networkx()` adapter loads the canonical network for analysis
 without making `networkx` a core dependency.
 
@@ -84,6 +101,7 @@ semantic_pipeline/
                        TemporalInteraction, CanonicalNetwork)
   layer1_observation/  interfaces + local backends + streaming/segmentation
   layer2_extraction/   interfaces, context, memory, pipeline, factory
+    text/              text assembly (alignment, subtitle tracks, lexicon, merge)
     extractors/        semantic axis (entities, ...)
     engines/           resource axis (shared LLM, ...)
   layer3_network/      normalize, scenes, stream, canonical, build, adapters
@@ -102,10 +120,12 @@ video, and `data/` is **not tracked** (regenerable, video-specific):
 data/<source_id>/
   source.json                    source metadata + time anchor
   observations.{speech,ocr,vision}.jsonl
+  text_stream.jsonl              Layer 2 assembled text, with every merge decision
+                                 (derived; rebuildable from the observations)
   semantic_events.jsonl          Layer 2 entity events
   temporal_interactions.jsonl    Layer 3 authoritative interaction stream
   canonical_network.json         Layer 3 derived network (rebuildable from the stream)
-  run_manifest.{speech,ocr,vision,ner,network}.json
+  run_manifest.{speech,ocr,vision,text,ner,network}.json
 ```
 
 The tracked, non-video-specific record of how to reproduce a run is the code plus
@@ -135,4 +155,23 @@ Two caveats on Binder:
   needs a local Ollama with the model pulled.
 - Binder is headless and Linux-only, so `environment.yml` uses the headless
   OpenCV build and omits the Windows-only `pywinpty`.
+
+## Open issues
+
+Found on a test set of 53 videos; kept for later work.
+
+- **Local NER model.** The local model (qwen2.5:3b) misses obvious entities in
+  some videos ("Hallo, ich bin Kolja von Volt" yields none, on every run), and
+  it returns dates, titles ("Dr.") and OCR misspellings as entities.
+- **On-screen text dominates the network.** Every entity in one OCR unit
+  co-occurs with every other, so a single text-heavy screen can contribute
+  hundreds of edges (about 90% of the co-occurrence weight overall). Layer 4
+  should analyse channels separately, or Layer 3 should link OCR entities per
+  line.
+- **Sticker overlays** in the subtitle band can hide a subtitle track.
+- **Karaoke captions:** OCR samples every 0.5 s, so it sees about half of the
+  words.
+- **Non-Latin on-screen text** (e.g. Hebrew) is read with the Latin OCR model.
+- **Shortened subtitles** can replace the spoken word on a tie ("Videoreihe"
+  becomes "Reihe").
 

@@ -88,18 +88,61 @@ class NERConfig:
     # Entity types the model is asked to tag (guidance only; the model may still
     # return others). Person names must come from text, never from vision.
     entity_types: tuple[str, ...] = ("PERSON", "ORG", "LOC", "GPE", "MISC")
-    # Speech/OCR overlap: burned-in subtitles duplicate spoken text. OCR units in
-    # these regions that duplicate an overlapping speech unit are dropped before
-    # extraction so the same utterance is not read twice (entity-level dedup).
-    subtitle_regions: tuple[str, ...] = ("lower", "bottom")
-    dedup_similarity_min: float = 0.8   # subtitle<->speech text similarity to drop
-    dedup_time_tolerance_s: float = 1.0  # time slack when matching subtitle to speech
+
+
+@dataclass(frozen=True)
+class TextConfig:
+    """Layer 2 text assembly: speech + OCR observations -> one text stream.
+
+    Burned-in subtitles are found from evidence in each video (no screen region
+    is assumed) and merged word by word into the speech transcript; other
+    on-screen text stays its own channel. See layer2_extraction/text/.
+    """
+
+    # Word-level alignment of an OCR line into the speech tokens.
+    token_sim_min: float = 0.72         # min similarity for a one-to-one word match
+    merge_sim_min: float = 0.78         # min similarity when a match joins several words
+    merge_token_cover_min: float = 0.5  # each joined word must be this much covered
+    skip_ocr_penalty: float = 0.4       # cost of leaving an OCR word unmatched
+    skip_speech_penalty: float = 0.15   # cost of skipping a spoken word inside a line
+    window_discover_s: float = 3.0      # speech searched around a line (track discovery)
+    window_refine_s: float = 1.5        # ... and around a subtitle line, offset-corrected
+    # Subtitle tracks: layout rows scored by how they render the speech.
+    layout_y_gap: float = 0.02          # split rows at vertical gaps (frame fraction)
+    layout_height_ratio: float = 1.6    # lines in a row have similar text height
+    line_aligned_min: float = 0.8       # a line "aligns" if this share of its words match
+    # Multi-line subtitles: adjacent subtitle-like rows stack into one candidate.
+    stack_aligned_share_min: float = 0.75  # a row is subtitle-like if most lines align
+    stack_gap_lines: float = 1.6           # max vertical step between rows (text heights)
+    stack_x_tol: float = 0.03              # same horizontal centre (frame fraction)
+    stack_height_ratio: float = 1.25       # same text height
+    track_min_lines: int = 3
+    track_aligned_share_min: float = 0.6
+    track_speech_coverage_min: float = 0.15   # must render this share of the speech
+    track_offset_iqr_max_s: float = 1.0       # stable time offset to the speech
+    track_median_lifetime_max_s: float = 4.0  # subtitle lines are short-lived
+    # Merging subtitle blocks (an OCR unit's subtitle lines) into the transcript.
+    merge_line_coverage_min: float = 0.5  # a subtitle block merges if this share aligns
+    max_gap_tokens: int = 4               # longest word run treated as a substitution
+    substitution_length_ratio_min: float = 0.5  # ... and of similar length (letters)
+    tie_break: str = "subtitle"           # "subtitle" | "speech": who wins a tie
+    # On-screen text that the speaker reads out (flagged, never merged).
+    read_aloud_coverage_min: float = 0.8
+    read_aloud_min_tokens: int = 3
+    # Lexicon (is a reading a real word?), chosen by the video's language.
+    lexicon: str = "wordfreq"             # "wordfreq" | "attested" (both channels only)
+    lexicon_min_zipf: float = 1.0         # wordfreq Zipf frequency counting as a word
+    compound_languages: tuple[str, ...] = ("de", "nl", "sv", "da", "nb", "no", "fi", "is")
+    compound_part_min_len: int = 4
+    compound_part_min_zipf: float = 2.5
+    compound_part_max_zipf: float = 6.0   # function words (sind, der) are no compound parts
 
 
 @dataclass(frozen=True)
 class ExtractionConfig:
-    """Layer 2 configuration: shared engines + per-extractor settings."""
+    """Layer 2 configuration: text assembly, shared engines, per-extractor settings."""
 
+    text: TextConfig = field(default_factory=TextConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
     ner: NERConfig = field(default_factory=NERConfig)
 

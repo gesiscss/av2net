@@ -5,8 +5,9 @@ All pipeline artifacts for a video live under one per-video directory:
     data/<source_id>/
         source.json                     source metadata + time anchor
         observations.{speech,ocr,vision}.jsonl
+        text_stream.jsonl
         semantic_events.jsonl
-        run_manifest.{speech,ocr,vision,ner}.json
+        run_manifest.{speech,ocr,vision,text,ner}.json
 
 `data/` is regenerable and not tracked. Namespacing by source_id lets several
 videos be processed in a row without their outputs colliding.

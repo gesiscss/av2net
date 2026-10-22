@@ -55,7 +55,11 @@ class SemanticEvent(_Frozen):
 
     Provenance travels with the event: `extractor` and `model` identify what
     produced it, and `observation_refs` point back to the originating
-    observations. Events are immutable and created once.
+    observations. `channel` is the semantic channel of the text the event came
+    from ("speech", "ocr", ...). It is explicit because a channel is not always
+    one modality: subtitle-corrected speech draws on OCR observations but is
+    still speech. Events without it (None) get their channel from the
+    observation ids' modality. Events are immutable and created once.
     """
 
     event_id: str
@@ -65,6 +69,7 @@ class SemanticEvent(_Frozen):
     t_start: float
     t_end: float
     observation_refs: tuple[str, ...] = ()
+    channel: str | None = None
     confidence: float | None = None
     nodes: tuple[Node, ...] = ()
     relations: tuple[Relation, ...] = ()
