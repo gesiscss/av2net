@@ -23,8 +23,9 @@ class CanonicalNode(_Frozen):
     node_id: str                     # canonical (normalized) id
     label: str                       # representative surface form
     node_type: str = "entity"
-    category: str | None = None      # dominant category (e.g. entity type)
-    categories: dict[str, int] = {}  # observed category distribution
+    category: str | None = None      # dominant type (for names a name type, e.g. "Person")
+    categories: dict[str, int] = {}  # observed type distribution
+    meta_category: str | None = None  # the dominant type's category (ontology.py), e.g. "agent"
     mention_count: int = 0
     first_seen: float = 0.0
     last_seen: float = 0.0

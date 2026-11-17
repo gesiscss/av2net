@@ -7,9 +7,12 @@
 #   * The three installed OpenCV distributions are consolidated to the single
 #     headless build (Binder has no display; the code uses only base cv2).
 #   * ffmpeg is provided via conda for audio/video decoding.
+#   * torch is the CPU build from PyTorch's CPU wheel index (PyPI's Linux build
+#     adds about 3 GB of CUDA libraries). GLiNER (default NER) runs on CPU.
 #
-# Note: the vision backend (run_vision.py) calls a local Ollama server, which is
-# not available on Binder. Speech and OCR run fully; vision needs a local Ollama.
+# Note: the vision backend (run_vision.py) and the optional LLM NER engine call a
+# local Ollama server, which is not available on Binder. Speech, OCR and GLiNER
+# NER run fully; vision and LLM NER need a local Ollama.
 name: av2net
 channels:
   - conda-forge
@@ -18,10 +21,12 @@ dependencies:
   - ffmpeg
   - pip
   - pip:
+      - --extra-index-url https://download.pytorch.org/whl/cpu
       - aiohappyeyeballs==2.7.1
       - aiohttp==3.14.1
       - aiosignal==1.4.0
       - aistudio-sdk==0.3.8
+      - annotated-doc==0.0.6
       - annotated-types==0.7.0
       - antlr4-python3-runtime==4.9.3
       - anyio==4.14.1
@@ -62,11 +67,12 @@ dependencies:
       - fsspec==2026.6.0
       - ftfy==6.3.1
       - future==1.0.0
+      - gliner==0.2.30
       - h11==0.16.0
-      - hf-xet==1.5.1
+      - hf-xet==1.8.0
       - httpcore==1.0.9
       - httpx==0.28.1
-      - huggingface_hub==1.22.0
+      - huggingface_hub==1.33.0
       - idna==3.18
       - imagesize==2.0.0
       - iniconfig==2.3.0
@@ -100,12 +106,15 @@ dependencies:
       - langdetect==1.0.9
       - lark==1.3.1
       - locate==1.1.1
+      - markdown-it-py==4.3.0
       - MarkupSafe==3.0.3
       - matplotlib==3.11.0
       - matplotlib-inline==0.2.2
+      - mdurl==0.1.2
       - mistune==3.3.2
       - modelscope==1.38.0
       - modelscope-hub==0.1.6
+      - mpmath==1.3.0
       - msgpack==1.2.3
       - multidict==6.7.1
       - narwhals==2.23.0
@@ -136,7 +145,7 @@ dependencies:
       - prometheus_client==0.25.0
       - prompt_toolkit==3.0.52
       - propcache==0.5.2
-      - protobuf==7.35.1
+      - protobuf==7.36.2
       - psutil==7.2.2
       - pure_eval==0.2.3
       - py-cpuinfo==9.0.0
@@ -162,6 +171,7 @@ dependencies:
       - rfc3339-validator==0.1.4
       - rfc3986-validator==0.1.1
       - rfc3987-syntax==1.1.0
+      - rich==15.0.0
       - rpds-py==2026.6.3
       - ruamel.yaml==0.19.1
       - safetensors==0.8.0
@@ -170,18 +180,24 @@ dependencies:
       - scipy==1.18.0
       - seaborn==0.13.2
       - Send2Trash==2.1.0
+      - sentencepiece==0.2.3
       - setuptools==82.0.1
       - shapely==2.1.2
+      - shellingham==1.5.4
       - six==1.17.0
       - soupsieve==2.8.4
       - stack-data==0.6.3
+      - sympy==1.14.0
       - terminado==0.18.1
       - threadpoolctl==3.6.0
       - tinycss2==1.5.1
       - tokenizers==0.23.1
+      - torch==2.15.0+cpu
       - tornado==6.5.7
       - tqdm==4.68.3
       - traitlets==5.15.1
+      - transformers==5.22.2
+      - typer==0.29.1
       - typing-inspection==0.4.2
       - typing_extensions==4.16.0
       - tzdata==2026.2

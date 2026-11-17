@@ -20,6 +20,7 @@ Numbers and other tokens containing digits always count as words.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from functools import lru_cache
 from typing import Iterable
 
 from ...config import TextConfig
@@ -109,18 +110,26 @@ class EitherLexicon(Lexicon):
         return any(lx.is_word(key) for lx in self._lexicons)
 
 
+@lru_cache(maxsize=None)
+def wordfreq_code(language: str | None) -> str | None:
+    """The wordfreq code for a language, or None if wordfreq does not cover it
+    (or is not installed). Shared by every step that consults the word lists."""
+    if not language:
+        return None
+    try:
+        from wordfreq import available_languages
+    except ImportError:
+        return None
+    code = _WORDFREQ_CODES.get(language, language.split("-")[0])
+    return code if code in available_languages() else None
+
+
 def build_lexicon(language: str | None, speech_keys: Iterable[str], ocr_keys: Iterable[str],
                   cfg: TextConfig) -> Lexicon:
     """The lexicon for one video: the configured word list for its language if
     available, always combined with the both-channels fallback."""
     attested = AttestedLexicon(speech_keys, ocr_keys)
-    if cfg.lexicon != "wordfreq" or not language:
-        return attested
-    try:
-        from wordfreq import available_languages
-    except ImportError:
-        return attested
-    code = _WORDFREQ_CODES.get(language, language.split("-")[0])
-    if code not in available_languages():
+    code = wordfreq_code(language) if cfg.lexicon == "wordfreq" else None
+    if code is None:
         return attested
     return EitherLexicon(WordfreqLexicon(code, cfg), attested)

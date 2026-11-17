@@ -72,7 +72,8 @@ class LLMConfig:
     """
 
     backend: str = "ollama"
-    model: str = "qwen2.5:3b"       # small instruction-tuned LM, local via Ollama
+    model: str = "qwen2.5:3b"       # small instruction-tuned LM, local via Ollama;
+                                    # qwen2.5:14b is the larger option (much slower on CPU)
     host: str | None = None         # None = default local Ollama server
     temperature: float = 0.0        # 0 + fixed seed for as-deterministic-as-possible
     seed: int = 0
@@ -80,14 +81,57 @@ class LLMConfig:
 
 
 @dataclass(frozen=True)
+class GlinerConfig:
+    """A GLiNER span-tagging model, the default NER engine.
+
+    GLiNER reads short label strings (not definitions) and returns labelled text
+    spans with scores. It runs on CPU without sampling, so the same text gives
+    the same spans. The multilingual checkpoint takes English labels for text in
+    any language. The model revision is pinned so that a run can be repeated.
+    """
+
+    model: str = "urchade/gliner_multi-v2.1"   # Apache-2.0, multilingual
+    revision: str | None = "443d26d654e0324125a96bebd8e796c14ff2efe6"  # None = latest
+    threshold: float = 0.5          # minimum span score
+    device: str = "cpu"
+    max_words: int = 150            # longer texts are tagged in chunks of whole words
+
+
+@dataclass(frozen=True)
 class NERConfig:
-    """The entity extractor (the first semantic extractor)."""
+    """The entity extractor: names in the text, typed with the name types in
+    ontology.py. Person names must come from text, never from vision.
+
+    Two engines can run it: "gliner" (default; a dedicated span-tagging model)
+    or "llm" (the shared instruction-tuned LLM). Which works better on this
+    material is not evaluated yet.
+    """
 
     enabled: bool = True
-    engine: str = "llm"             # which engine (resource) this extractor uses
-    # Entity types the model is asked to tag (guidance only; the model may still
-    # return others). Person names must come from text, never from vision.
-    entity_types: tuple[str, ...] = ("PERSON", "ORG", "LOC", "GPE", "MISC")
+    engine: str = "gliner"          # "gliner" | "llm"
+    # GLiNER labels and the name type each stands for (ontology.NAME_TYPES); a
+    # corpus may add labels mapped to existing types. Labels mapped to None are
+    # decoys: they draw dates, times and numbers away from the name labels and
+    # are then discarded (they are not names, and an event already has a time).
+    # The wording was chosen on a handful of sentences only.
+    gliner_labels: tuple[tuple[str, str | None], ...] = (
+        ("person", "Person"),
+        ("nationality", "Group"),
+        ("organization", "Organization"),
+        ("location", "Place"),
+        ("event", "Event"),
+        ("work of art", "Work"),
+        ("product", "Product"),
+        ("language", "Other"),
+        ("date", None),
+        ("time", None),
+        ("number", None),
+    )
+    # A single word among the most frequent words of the span's language
+    # (pronouns, articles: wordfreq Zipf at least this) is not a name. Skipped
+    # for languages wordfreq does not cover.
+    drop_function_words: bool = True
+    function_word_min_zipf: float = 6.0
 
 
 @dataclass(frozen=True)
@@ -144,6 +188,7 @@ class ExtractionConfig:
 
     text: TextConfig = field(default_factory=TextConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
+    gliner: GlinerConfig = field(default_factory=GlinerConfig)
     ner: NERConfig = field(default_factory=NERConfig)
 
 
@@ -167,9 +212,9 @@ class NetworkConfig:
     resolve_fuzzy: bool = True
     fuzzy_threshold: float = 0.90            # min SequenceMatcher ratio to merge
     fuzzy_min_length: int = 4                # shorter keys must match exactly (protects "A2")
-    # Categories allowed to merge across (besides identical type). MISC merges
-    # only with MISC; PERSON/ORG/... never cross.
-    type_merge_groups: tuple[tuple[str, ...], ...] = (("LOC", "GPE"),)
+    # Name types allowed to fuzzy-merge across (besides identical type). None by
+    # default: names merge only within one type (Person never with Organization).
+    type_merge_groups: tuple[tuple[str, ...], ...] = ()
 
 
 @dataclass(frozen=True)

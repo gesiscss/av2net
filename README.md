@@ -57,10 +57,17 @@ the stream is derived and rebuildable from the observations.
 - **extractors** (semantic axis) - one module per semantic dimension. Entities
   (NER) is the first; relations, sentiment, etc. are added as new modules.
 - **engines** (resource axis) - one wrapper per model/package, built once and
-  shared. Local NER uses a small instruction-tuned LLM via Ollama (`qwen2.5:3b`).
+  shared. NER runs on GLiNER by default (`urchade/gliner_multi-v2.1`, a
+  multilingual span-tagging model that runs on CPU, downloaded from Hugging Face
+  on first use); `--engine llm` uses an instruction-tuned LLM via Ollama
+  (`qwen2.5:3b` by default, `--model qwen2.5:14b` for the larger model).
 
-NER draws entities from the text stream (speech + on-screen text) only, never
-from vision. Run script: [run_ner.py](run_ner.py).
+NER draws names from the text stream (speech + on-screen text) only, never
+from vision. Names are typed with the name types in
+[semantic_pipeline/ontology.py](semantic_pipeline/ontology.py) (Person, Group,
+Organization, Place, Event, Work, Product, Other); Layer 3 adds each type's
+category (agent, organization, location, ...). Common nouns will come from a
+separate concept extractor (not built yet). Run script: [run_ner.py](run_ner.py).
 
 ## Layer 3 (Network construction)
 
@@ -150,9 +157,10 @@ video under `input/`, and run the Layer 1 scripts.
 
 Two caveats on Binder:
 
-- The vision backend ([run_vision.py](run_vision.py)) calls a local **Ollama**
-  server, which is not available on Binder. Speech and OCR run fully; vision
-  needs a local Ollama with the model pulled.
+- The vision backend ([run_vision.py](run_vision.py)) and the optional LLM NER
+  engine call a local **Ollama** server, which is not available on Binder.
+  Speech, OCR and GLiNER NER run fully; vision and LLM NER need a local Ollama
+  with the model pulled.
 - Binder is headless and Linux-only, so `environment.yml` uses the headless
   OpenCV build and omits the Windows-only `pywinpty`.
 
@@ -160,9 +168,11 @@ Two caveats on Binder:
 
 Found on a test set of 53 videos; kept for later work.
 
-- **Local NER model.** The local model (qwen2.5:3b) misses obvious entities in
-  some videos ("Hallo, ich bin Kolja von Volt" yields none, on every run), and
-  it returns dates, titles ("Dr.") and OCR misspellings as entities.
+- **NER quality is not evaluated yet.** GLiNER tags some common nouns as names
+  ("Markt" as Place, "Unfall" as Event) and keeps titles inside person names
+  ("Dr. Jonas Weber"). The earlier LLM run (qwen2.5:3b) missed obvious names in
+  some videos and returned dates, titles and OCR misspellings. A comparison
+  against a hand-annotated sample is planned.
 - **On-screen text dominates the network.** Every entity in one OCR unit
   co-occurs with every other, so a single text-heavy screen can contribute
   hundreds of edges (about 90% of the co-occurrence weight overall). Layer 4

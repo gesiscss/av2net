@@ -10,8 +10,9 @@ pipeline or the run scripts.
 from __future__ import annotations
 
 from ..config import ExtractionConfig
+from .engines.gliner_engine import GlinerEngine
 from .engines.llm_ollama import OllamaLLM
-from .extractors.entities import EntityExtractor
+from .extractors.entities import GlinerEntityExtractor, LLMEntityExtractor
 from .interfaces import Engine, SemanticExtractor
 
 
@@ -27,12 +28,20 @@ def build_extractors(
             engines["llm"] = OllamaLLM(cfg.llm)
         return engines["llm"]
 
+    def gliner_engine() -> GlinerEngine:
+        # Building is cheap: the model itself loads when tagging starts.
+        if "gliner" not in engines:
+            engines["gliner"] = GlinerEngine(cfg.gliner)
+        return engines["gliner"]
+
     extractors: list[SemanticExtractor] = []
 
     if cfg.ner.enabled:
-        engine = llm_engine() if cfg.ner.engine == "llm" else None
-        if engine is None:
-            raise ValueError(f"Unknown engine for NER: {cfg.ner.engine!r}")
-        extractors.append(EntityExtractor(engine, cfg.ner))
+        if cfg.ner.engine == "gliner":
+            extractors.append(GlinerEntityExtractor(gliner_engine(), cfg.ner))
+        elif cfg.ner.engine == "llm":
+            extractors.append(LLMEntityExtractor(llm_engine(), cfg.ner))
+        else:
+            raise ValueError(f"Unknown engine for NER: {cfg.ner.engine!r} (use 'gliner' or 'llm')")
 
     return extractors, engines

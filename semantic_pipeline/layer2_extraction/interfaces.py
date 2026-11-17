@@ -19,7 +19,8 @@ query the semantic network (that is Layer 3+), so no network handle is offered.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Any
+from dataclasses import dataclass
+from typing import Any, Sequence
 
 from ..models.event import SemanticEvent
 from .context import TextSpan
@@ -43,6 +44,26 @@ class LLMEngine(Engine):
     ) -> Any:
         """Run one completion and return the parsed JSON value. `schema` (a JSON
         Schema) constrains the output when the backend supports it."""
+
+
+@dataclass(frozen=True)
+class TaggedSpan:
+    """A labelled stretch of text found by a span tagger. `start`/`end` are
+    character offsets into the tagged text; `text` is that slice."""
+
+    start: int
+    end: int
+    text: str
+    label: str
+    score: float
+
+
+class SpanTaggerEngine(Engine):
+    """A model that finds text spans of given label types (e.g. GLiNER)."""
+
+    @abstractmethod
+    def tag(self, text: str, labels: Sequence[str]) -> list[TaggedSpan]:
+        """The labelled spans in `text`, each with the model's score."""
 
 
 class SemanticExtractor(ABC):

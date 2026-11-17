@@ -10,7 +10,7 @@ re-extraction). Two levels:
 2. Fuzzy merge (optional): distinct keys are merged when they are edit-distance
    similar AND type-compatible. This catches OCR/spelling variants
    ("Hühner"/"Hüthner", "Drei Atomreakto-ren"/"Drei Atomreaktoren"). It is gated
-   so it never merges across incompatible categories (e.g. PERSON vs ORG), short
+   so it never merges across name types (e.g. Person vs Organization), short
    strings never fuzzy-merge (protects "A2" vs "A3"), and clustering is by
    connected components so the result is independent of comparison order.
 

@@ -4,7 +4,8 @@ Pure aggregation over the stream, so the canonical network is always reproducibl
 from the (authoritative) interaction stream with no video and no re-extraction:
 
     nodes   reconciled entities: representative label (most frequent surface),
-            dominant category + category distribution, mention count, first/last seen
+            dominant type + type distribution, the type's shared category
+            (ontology mapping, see ontology.py), mention count, first/last seen
     edges   aggregated co-occurrence: total weight, per-grounding breakdown,
             first/last seen
 
@@ -17,6 +18,7 @@ from collections import Counter, defaultdict
 
 from ..models.interaction import TemporalInteraction
 from ..models.network import CanonicalEdge, CanonicalNetwork, CanonicalNode
+from ..ontology import category_of
 
 
 def build_canonical(source_id: str, interactions: list[TemporalInteraction]) -> CanonicalNetwork:
@@ -64,19 +66,21 @@ def build_canonical(source_id: str, interactions: list[TemporalInteraction]) -> 
             return default
         return sorted(counter.items(), key=lambda kv: (-kv[1], kv[0]))[0][0]
 
-    nodes = tuple(
-        CanonicalNode(
+    def node(n: str) -> CanonicalNode:
+        dominant = best(categories[n])
+        return CanonicalNode(
             node_id=n,
             label=best(labels[n], default=n),
             node_type="entity",
-            category=best(categories[n]),
+            category=dominant,
             categories=dict(categories[n]),
+            meta_category=category_of(dominant),
             mention_count=int(mention_count[n]),
             first_seen=first_seen.get(n, 0.0),
             last_seen=last_seen.get(n, 0.0),
         )
-        for n in sorted(node_ids)
-    )
+
+    nodes = tuple(node(n) for n in sorted(node_ids))
 
     edges = tuple(
         CanonicalEdge(

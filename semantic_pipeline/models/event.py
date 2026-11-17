@@ -31,13 +31,17 @@ class Node(_Frozen):
 
     `label` is the surface form as found in the observation text (not yet
     normalized; identifier normalization and alias resolution are Layer 3's job).
-    `node_type` is the broad kind of node ("entity"); `category` is the
-    extractor-specific subtype (e.g. an entity type such as "PERSON").
+    `node_type` is the broad kind of node ("entity" for names); `category` is the
+    extractor-specific subtype (for names, a name type from ontology.py such as
+    "Person"; Layer 3 maps it to its shared category). `confidence` is the
+    model's score for this node, if the model gives one (GLiNER does, the LLM
+    does not).
     """
 
     label: str
     node_type: str
     category: str | None = None
+    confidence: float | None = None
 
 
 class Relation(_Frozen):

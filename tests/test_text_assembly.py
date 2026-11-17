@@ -11,7 +11,7 @@ import pytest
 
 from semantic_pipeline.config import TextConfig
 from semantic_pipeline.layer2_extraction.context import TextSpan
-from semantic_pipeline.layer2_extraction.extractors.entities import EntityExtractor
+from semantic_pipeline.layer2_extraction.extractors.entities import LLMEntityExtractor
 from semantic_pipeline.layer2_extraction.interfaces import LLMEngine
 from semantic_pipeline.layer2_extraction.memory import EpisodicMemory
 from semantic_pipeline.layer2_extraction.text import assemble, build_lexicon
@@ -340,7 +340,7 @@ def test_entity_events_carry_span_id_channel_and_all_observations():
                     text="„Reiche, heute", channel="speech", origin="speech+subtitle",
                     observation_id=f"{SRC}:speech:000001",
                     observation_refs=(f"{SRC}:speech:000001", f"{SRC}:ocr:000003"))
-    [event] = EntityExtractor(_FakeLLM(), NERConfig()).extract(span, EpisodicMemory())
+    [event] = LLMEntityExtractor(_FakeLLM(), NERConfig()).extract(span, EpisodicMemory())
     assert event.event_id == f"{SRC}:speech:000001:entities"
     assert event.channel == "speech" and event.observation_refs == span.observation_refs
 

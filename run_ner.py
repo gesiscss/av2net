@@ -6,14 +6,21 @@ run_text.py), runs the entity extractor, and writes into data/<source_id>/:
     semantic_events.jsonl        SemanticEvent stream (entity events)
     run_manifest.ner.json        counts, model, config, versions, timing
 
-Vision observations are not used: named entities come from text only. With no
---source-id, every video under data/ that has observations is processed in a row.
+Names are typed with the name types in semantic_pipeline/ontology.py. Vision
+observations are not used: names come from text only. With no --source-id, every
+video under data/ that has observations is processed in a row.
 
 Usage:
-    python run_ner.py [--datadir data] [--source-id ID ...] [--model NAME]
+    python run_ner.py [--datadir data] [--source-id ID ...] [--engine gliner|llm] [--model NAME]
 
-Requires a running local Ollama server with the configured model pulled
-(default qwen2.5:3b).
+--engine chooses who finds the names:
+    gliner  (default) a multilingual span-tagging model, downloaded from Hugging
+            Face on first use and cached; runs on CPU
+    llm     an instruction-tuned model on a local Ollama server (default
+            qwen2.5:3b; --model qwen2.5:14b for the larger, much slower model;
+            the model must be pulled)
+--model overrides the chosen engine's model (a Hugging Face id for gliner, which
+then uses that model's latest revision; an Ollama model name for llm).
 """
 
 from __future__ import annotations
@@ -52,6 +59,7 @@ def _process(rd: Path, config: Config, extractors) -> None:
 
     n = write_jsonl(rd / "semantic_events.jsonl", events)
     n_entities = sum(len(e.nodes) for e in events)
+    by_type = dict(sorted(Counter(nd.category for e in events for nd in e.nodes).items()))
 
     manifest = {
         "layer": 2,
@@ -64,10 +72,15 @@ def _process(rd: Path, config: Config, extractors) -> None:
         "n_spans_by_origin": by_origin,
         "n_events": n,
         "n_entity_nodes": n_entities,
+        "n_entity_nodes_by_type": by_type,
         "elapsed_seconds": round(elapsed, 1),
         "config": config.to_dict(),
         "library_versions": {
+            "gliner": pkg("gliner"),
+            "torch": pkg("torch"),
+            "transformers": pkg("transformers"),
             "ollama": pkg("ollama"),
+            "wordfreq": pkg("wordfreq"),
             "pydantic": pkg("pydantic"),
         },
     }
@@ -82,7 +95,9 @@ def main() -> None:
     ap.add_argument("--datadir", default=DEFAULT_DATA_DIR, help="per-video data root")
     ap.add_argument("--source-id", nargs="*", default=None,
                     help="specific source id(s); default: all with observations")
-    ap.add_argument("--model", default=None, help="override the local LLM model")
+    ap.add_argument("--engine", choices=("gliner", "llm"), default=None,
+                    help="NER engine (default: gliner)")
+    ap.add_argument("--model", default=None, help="override the chosen engine's model")
     args = ap.parse_args()
 
     if args.source_id:
@@ -93,17 +108,20 @@ def main() -> None:
         ap.error(f"no processed videos found under {args.datadir}/ (run Layer 1 first)")
 
     config = Config.local_default()
+    ext = config.extraction
+    if args.engine:
+        ext = replace(ext, ner=replace(ext.ner, engine=args.engine))
     if args.model:
-        config = replace(
-            config,
-            extraction=replace(config.extraction,
-                               llm=replace(config.extraction.llm, model=args.model)),
-        )
+        if ext.ner.engine == "llm":
+            ext = replace(ext, llm=replace(ext.llm, model=args.model))
+        else:  # the pinned revision belongs to the default model
+            ext = replace(ext, gliner=replace(ext.gliner, model=args.model, revision=None))
+    config = replace(config, extraction=ext)
 
     # Build the shared engine + extractors once; reuse across all videos.
     extractors, engines = build_extractors(config.extraction)
-    print(f"Processing {len(run_dirs)} video(s); "
-          f"model {config.extraction.llm.model} (backend {config.extraction.llm.backend})")
+    print(f"Processing {len(run_dirs)} video(s); NER engine {ext.ner.engine}: "
+          f"{', '.join(e.model_id for e in extractors)}")
     for rd in run_dirs:
         _process(rd, config, extractors)
 

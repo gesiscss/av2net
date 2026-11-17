@@ -27,3 +27,6 @@ Thumbs.db
 
 # Literature
 literature/
+
+# Local design notes and research reports (kept out of the shared repo)
+docs/
