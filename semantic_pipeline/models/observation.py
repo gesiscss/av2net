@@ -3,8 +3,8 @@
 Each modality is segmented at its own natural rhythm and produces a stream of
 interval observation units on a shared timeline:
     speech  -> sentence units          (SpeechObservation)
-    ocr     -> on-screen-text units     (added in step 2)
-    vision  -> shot/scene units         (added in step 3)
+    ocr     -> on-screen-text units     (OCRObservation)
+    vision  -> shot/scene units         (VisionObservation)
 
 Every unit is an interval `[t_start, t_end)` in offset seconds from the source's
 time anchor (the anchor itself lives in the SourceRecord, not here). Units are

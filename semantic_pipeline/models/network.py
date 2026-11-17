@@ -3,7 +3,7 @@
 The canonical network is the analysis-facing view, derived from (and always
 reproducible from) the temporal interaction stream. Construction is descriptive
 node reconciliation and edge aggregation only, no interpretation and no graph
-analytics (those are Layer 4).
+analytics (those belong to the analysis).
 
 Nodes are reconciled entities; edges are aggregated co-occurrences. Every field is
 an aggregate over the stream, so rebuilding from a new/extended stream requires no

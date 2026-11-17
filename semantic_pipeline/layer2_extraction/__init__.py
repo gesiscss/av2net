@@ -9,7 +9,7 @@ Extraction then has two axes, kept separate (see interfaces.py):
     engines/     the resource axis  -- one wrapper per model/package, shared
 
 Layer 2 uses bounded episodic memory only and never queries the semantic network.
-Two extractors so far: entities (names, NER) and concepts (common nouns). The
+Two extractors: entities (names, NER) and concepts (common nouns). The
 category table for concepts is filled at corpus level (categorize.py) and
 applied in Layer 3.
 """

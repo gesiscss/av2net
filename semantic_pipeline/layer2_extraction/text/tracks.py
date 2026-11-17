@@ -17,11 +17,11 @@ the lower lines of a block are spoken after the block appears.
 
 Once tracks are known, the subtitle lines of each OCR unit are read together as
 one block in reading order and re-aligned in a tight window corrected by the
-track offset. The block gives short lines their context: the one-word second
-line "und" of "Ausnutzung von Notlagen / und" is pinned to the right "und".
-Words hyphenated across lines ("Bundes- / regierung") are rejoined when the
-joined form is a real word. Bracketed annotations such as "[Applaus]" are not
-speech and are left out.
+track offset. The block gives short lines their context: a one-word second line
+such as "and" is pinned to the right "and" through the line above it. Words
+hyphenated across lines ("infor- / mation") are rejoined when the joined form is
+a real word. Bracketed annotations such as "[Applause]" are not speech and are
+left out.
 
 Line classes:
 

@@ -1,10 +1,10 @@
-"""Shared node vocabulary: categories and name types (agreed 2026-11-16).
+"""Shared node vocabulary: categories and name types.
 
 Two levels:
 
 * Categories: one set for every node kind. These are AutoMap's meta-network
-  categories, with group folded into agent and action left out until verbs are
-  extracted. The meta-network's cells are pairs of categories.
+  categories, with group folded into agent, and without action, since no verbs
+  are extracted. The meta-network's cells are pairs of categories.
 * Name types: the fine types the NER step gives to names. Each maps to one
   category.
 
@@ -39,11 +39,11 @@ CATEGORIES: dict[str, str] = {
     "knowledge": "Information, ideas, skills and topics, and works that carry them.",
     "attribute": "A property or state of an agent or thing.",
     "time": "A period or point in time.",
-    UNASSIGNED: "Not categorized yet, or fits no category.",
+    UNASSIGNED: "No category assigned, or fits none.",
 }
 
 # Common-noun examples per category, in several languages and from several
-# domains (docs/node-types.md, section 3). Shown to models that assign categories.
+# domains. Shown to models that assign categories.
 CATEGORY_EXAMPLES: dict[str, str] = {
     "agent": "child, Nachbarin, fans, público",
     "role": "teacher, Trainerin, médico, moderator",
@@ -57,7 +57,7 @@ CATEGORY_EXAMPLES: dict[str, str] = {
     "time": "summer, Woche, futuro, evening",
 }
 
-# The agreed rule separating the two person categories (docs/node-types.md, section 3).
+# The rule separating the two person categories. Shown to models that assign categories.
 AGENT_ROLE_RULE = (
     "Nouns for occupations and functions are role; nouns that describe people in other "
     "ways (age, relation, residence, fandom) are agent."

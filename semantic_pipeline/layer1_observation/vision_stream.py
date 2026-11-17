@@ -5,8 +5,9 @@ not to gradual intra-shot motion, so a talking or walking person does not spawn 
 shot), then runs the vision interpreter once per shot on a representative frame.
 Each shot yields one VisionObservation covering the shot interval.
 
-Vision is the slow modality (~40s/frame on CPU), and one call per shot keeps the
-count minimal: cost scales with the number of distinct scenes, not with duration.
+Vision is the slow modality (tens of seconds per frame on a CPU), and one call
+per shot keeps the count minimal: cost scales with the number of distinct
+scenes, not with duration.
 """
 
 from __future__ import annotations

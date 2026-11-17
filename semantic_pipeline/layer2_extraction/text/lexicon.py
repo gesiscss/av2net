@@ -1,13 +1,13 @@
 """Is this a real word? The evidence the merge uses against OCR misreadings.
 
-OCR misreadings mostly produce non-words ("Hüthner", "Hlitze"), while the speech
+OCR misreadings mostly produce non-words ("informatlon", "rnodern"), while the speech
 recognizer's errors are real words. A lexicon lets the merge drop readings that
 are not words. It sits behind one small interface, chosen per video language:
 
     WordfreqLexicon   frequency word lists (wordfreq, about 40 languages), with
                       a two-part compound check for compounding languages (parts
-                      must be content words: function words such as "sind" are
-                      too frequent, so OCR run-ons like "sindallerdings" are not
+                      must be content words: function words such as "und" are
+                      too frequent, so OCR run-ons like "undhaus" are not
                       mistaken for compounds)
     AttestedLexicon   language-independent fallback: a word counts as real if
                       both channels (speech and OCR) attest it somewhere in the

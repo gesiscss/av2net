@@ -5,11 +5,10 @@ skipped, while speech tokens before and after the line skip for free (a line
 renders only part of the speech) and skips inside it are cheap (subtitles
 condense speech). Tokens match fuzzily, so misreadings and mishearings still
 align. A match may also join several tokens on one side, which repairs spacing
-("sindmittlerweile" ~ "sind mittlerweile") and recognizer run-ons
-("Welterstempel" ~ "Welt, Herr Strempel"). Such a merge is accepted only if
-every joined token is substantially covered by matching characters, so it can
-never swallow a whole extra word ("mittlerweile elf" is not a respelling of
-"mittlerweile").
+("bothsides" ~ "both sides") and recognizer run-ons (one heard word standing
+for several written ones). Such a merge is accepted only if every joined token
+is substantially covered by matching characters, so it can never swallow a
+whole extra word ("both sides now" is not a respelling of "bothsides").
 
 Each line is aligned against a bounded time window of speech tokens, so the
 cost per line is constant and alignment scales linearly with video length.

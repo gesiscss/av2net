@@ -1,9 +1,7 @@
 """Local OCREngine backend: RapidOCR 3.x on onnxruntime.
 
-Chosen over PaddleOCR for speed: paddle 3.x CPU inference crashes with oneDNN
-under its PIR executor on this build, and runs ~10x slow with oneDNN off (9-31s
-per frame). RapidOCR on onnxruntime reads the same PP-OCR models at ~1-2s per
-frame with no such issue.
+RapidOCR runs the PP-OCR models of PaddleOCR on onnxruntime and is fast on a
+CPU (about one to two seconds per frame).
 
 Language-agnostic: the detected language (ISO code) is routed to the matching
 recognition script family (LATIN, CYRILLIC, ARABIC, DEVANAGARI, JAPAN, KOREAN,

@@ -1,13 +1,12 @@
-"""Identifier normalization and alias resolution (v1, deterministic).
+"""Identifier normalization (deterministic).
 
-Maps an entity surface form to a canonical node id. v1 is conservative: casefold,
-strip punctuation, collapse whitespace. Two surface forms with the same normalized
-key are treated as the same entity ("Frankreich" / "Frankreich," / "FRANKREICH").
+Maps an entity surface form to a normalized key: casefold, strip punctuation,
+collapse whitespace. Two surface forms with the same key are treated as the same
+entity ("France" / "France," / "FRANCE").
 
-This is deliberately shallow. Fuzzy matching, coreference, and cross-channel name
-fusion ("Katharina" + "Frau Reiche" -> "Katharina Reiche") are a later, richer
-resolution pass; keeping v1 exact-normalized keeps Layer 3 descriptive and
-non-interpretive.
+This is deliberately shallow. Merging near-identical spellings is done in
+resolve.py; deciding that different names refer to one referent (coreference)
+is not done, which keeps Layer 3 descriptive and non-interpretive.
 """
 
 from __future__ import annotations

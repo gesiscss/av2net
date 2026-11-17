@@ -1,9 +1,9 @@
 """Text assembly: Layer 1 speech + OCR observations -> the text stream Layer 2 reads.
 
 Speech recognition and OCR fail differently. The recognizer mishears whole words
-and still produces real words, often with high confidence ("Bereiche" for
-"Reiche"); OCR misreads characters and drops spaces, producing non-words
-("Hüthner", "sindmittlerweile"). Burned-in subtitles render the speech, so where
+and still produces real words, often with high confidence ("flower" for
+"flour"); OCR misreads characters and drops spaces, producing non-words
+("informatlon", "bothsides"). Burned-in subtitles render the speech, so where
 a video has them, each source corrects the other, and the result is one improved
 transcript. Other on-screen text (headlines, banners, credits) is a separate
 source and stays its own channel; it is never merged into the speech.

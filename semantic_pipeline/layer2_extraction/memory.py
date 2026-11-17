@@ -2,8 +2,8 @@
 
 It is intentionally lightweight and bounded (Layer 2 must not query the semantic
 network and must run in roughly linear time and bounded space). It holds recent
-semantic context only: recently introduced entities, the current speaker and
-topic (placeholders for now), and the current time.
+semantic context only: recently introduced entities, the current time and
+channel, and slots for the current speaker and topic, which no extractor fills.
 
 Entities are kept in a fixed-length ring so memory never grows with video length.
 """
@@ -20,8 +20,8 @@ class EpisodicMemory:
         self._recent: deque[tuple[str, float]] = deque(maxlen=max_entities)
         self.current_time: float = 0.0
         self.current_channel: str | None = None
-        self.current_speaker: str | None = None   # reserved (no diarization yet)
-        self.current_topic: str | None = None      # reserved (no topic extractor yet)
+        self.current_speaker: str | None = None   # not filled: no speaker diarization
+        self.current_topic: str | None = None      # not filled: no topic extractor
 
     def observe(self, span: TextSpan) -> None:
         """Advance the clock to a span as the pipeline reaches it."""

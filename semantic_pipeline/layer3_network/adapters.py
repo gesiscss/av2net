@@ -1,10 +1,10 @@
-"""Optional adapter to a graph library (Layer 3/4 boundary).
+"""Optional adapter to a graph library (the boundary to analysis).
 
 The canonical network is stored as plain, portable data (see models/network.py).
-This adapter materializes it into a networkx graph for Layer 4 analysis. networkx
-is imported lazily so the Layer 3 core has no hard dependency on it, and the
-authoritative record stays library-agnostic. Layer 4 may swap in a different graph
-or temporal-network library by writing its own adapter over the same stream.
+This adapter materializes it into a networkx graph for analysis. networkx is
+imported lazily so the Layer 3 core has no hard dependency on it, and the
+authoritative record stays library-agnostic. An analysis can use a different
+graph or temporal-network library by writing its own adapter over the same stream.
 """
 
 from __future__ import annotations

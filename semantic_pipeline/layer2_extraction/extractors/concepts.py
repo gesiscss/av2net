@@ -4,8 +4,8 @@ Reads one text span and emits at most one SemanticEvent carrying its common
 nouns, one node per distinct lemma. A part-of-speech tagger with models for many
 languages (StanzaEngine) finds the nouns: words tagged NOUN in the Universal
 Dependencies tag set, which is the same in every language. Proper nouns (PROPN)
-are left to the entity extractor. There is no salience judgment: salience comes
-later from frequency and network position.
+are left to the entity extractor. There is no salience judgment: salience can be
+read from frequency and network position.
 
 The tagger model is chosen by the span's recorded language. Spans without a
 language, or in a language the tagger has no model for, give no event; the run

@@ -12,7 +12,7 @@ from the (authoritative) interaction stream with no video and no re-extraction:
     edges   aggregated co-occurrence: total weight, per-grounding breakdown,
             first/last seen
 
-No graph analytics here (that is Layer 4); this only groups and counts.
+No graph analytics here (that is the analysis's job); this only groups and counts.
 """
 
 from __future__ import annotations

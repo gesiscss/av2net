@@ -7,7 +7,7 @@ Converts the Layer 2 SemanticEvent stream into the two representations:
 
 This layer is descriptive ("what happened"): identifier normalization, alias
 resolution, duplicate detection, and confidence/edge aggregation. It performs no
-graph analytics and never touches the MP4 (analysis is Layer 4). Co-occurrence is
+graph analytics and never touches the MP4 (analysis is separate). Co-occurrence is
 grounded in the observation structure (segments and vision shots), never a tunable
 time window.
 """

@@ -55,7 +55,7 @@ class VisionConfig:
 
 @dataclass(frozen=True)
 class ObservationConfig:
-    # Retained for OCR/vision sampling; speech no longer uses fixed windows.
+    # Frame sampling for the OCR and vision streams, and a limit on the processed duration.
     frame_position: str = "mid"     # where in a span to sample the frame: start|mid|end
     max_duration_s: float | None = None  # cap processing; None = whole video
     jpeg_quality: int = 90
@@ -103,8 +103,7 @@ class NERConfig:
     ontology.py. Person names must come from text, never from vision.
 
     Two engines can run it: "gliner" (default; a dedicated span-tagging model)
-    or "llm" (the shared instruction-tuned LLM). Which works better on this
-    material is not evaluated yet.
+    or "llm" (the shared instruction-tuned LLM).
     """
 
     enabled: bool = True
@@ -113,7 +112,6 @@ class NERConfig:
     # corpus may add labels mapped to existing types. Labels mapped to None are
     # decoys: they draw dates, times and numbers away from the name labels and
     # are then discarded (they are not names, and an event already has a time).
-    # The wording was chosen on a handful of sentences only.
     gliner_labels: tuple[tuple[str, str | None], ...] = (
         ("person", "Person"),
         ("nationality", "Group"),
@@ -171,13 +169,10 @@ class ConceptCategoryConfig:
       words; a label counts only when the labelled stretch contains exactly one
       noun. Each lemma gets the category with the most votes over its
       occurrences, or two when they tie; lemmas without a vote are unassigned.
-      The label wording was chosen on a handful of sentences in three languages.
     * "llm": the shared instruction-tuned LLM (LLMConfig; --model overrides it)
       reads the category definitions with examples in several languages and
       assigns each lemma one category, or two if ambiguous, from one snippet
       where it occurs. Lemmas are sent in batches.
-
-    Which engine works better is not evaluated yet.
     """
 
     engine: str = "gliner"          # "gliner" | "llm"
@@ -284,7 +279,7 @@ class NetworkConfig:
     """Layer 3 (temporal network construction).
 
     Co-occurrence is grounded in the observation structure, never a tunable time
-    window (temporal proximity is a Layer 4 analysis concern). Three structural
+    window (temporal proximity is a question for the analysis). Three structural
     sources can be toggled independently.
     """
 

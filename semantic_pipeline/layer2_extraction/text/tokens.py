@@ -1,8 +1,8 @@
 """Comparable tokens for the two text channels.
 
 A token keeps its surface form, which is what goes back into the text, and a
-comparison key (lowercase letters and digits only), so "„Reiche," compares as
-"reiche" and "9.000" as "9000" while the output keeps the quotes and dots.
+comparison key (lowercase letters and digits only), so "„Haus," compares as
+"haus" and "9.000" as "9000" while the output keeps the quotes and dots.
 
 Speech tokens come from the recognizer's word timestamps and keep its spacing
 (Whisper words carry a leading space; number parts such as " 9" + ".000" carry

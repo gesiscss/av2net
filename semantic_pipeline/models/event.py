@@ -4,11 +4,11 @@ Layer 2 turns observations into semantic events. A semantic event is a small,
 immutable, modality-independent statement about the semantic world, carrying its
 own provenance (which extractor and model produced it, from which observation).
 
-The event is deliberately generic: it holds nodes and (later) typed relations, a
+The event is deliberately generic: it holds nodes and typed relations, a
 timestamp, a confidence, and references to the originating observations. Every
-semantic extractor (entities first, relations/sentiment/... later) emits the same
-SemanticEvent type, so Layer 3 can build the temporal network from one stream
-without knowing which extractor produced any given event.
+semantic extractor emits the same SemanticEvent type, so Layer 3 can build the
+temporal network from one stream without knowing which extractor produced any
+given event.
 
 Modality independence: an event never references frames, OCR regions, or audio
 segments as nodes. It keeps only `observation_refs` (opaque observation ids) so
@@ -29,8 +29,8 @@ class _Frozen(BaseModel):
 class Node(_Frozen):
     """A semantic node introduced by an extractor.
 
-    `label` is the surface form as found in the observation text (not yet
-    normalized; identifier normalization and alias resolution are Layer 3's job).
+    `label` is the surface form as found in the observation text (unnormalized;
+    identifier normalization and alias resolution are Layer 3's job).
     `node_type` is the broad kind of node ("entity" for names, "concept" for
     common nouns); `category` is the extractor-specific subtype (for names, a
     name type from ontology.py such as "Person", which Layer 3 maps to its shared

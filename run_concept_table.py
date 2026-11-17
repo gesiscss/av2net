@@ -1,8 +1,8 @@
 """Layer 2, step 3 - Generated category table for concepts.
 
 Collects every (lemma, language) in the videos' concept events
-(semantic_events.concepts.jsonl, see run_concepts.py) that the table does not
-have yet, has a model assign each one a category from ontology.CATEGORIES (or
+(semantic_events.concepts.jsonl, see run_concepts.py) that are not in the
+table, has a model assign each one a category from ontology.CATEGORIES (or
 two for an ambiguous lemma), and appends the new rows to one corpus-level table
 per engine:
     data/concept_table.<engine>.jsonl              the table (append-only)
@@ -15,10 +15,10 @@ per engine:
     llm     an instruction-tuned model on a local Ollama server (default
             qwen2.5:3b; --model qwen2.5:14b for the larger, much slower model;
             the model must be pulled). It reads the category definitions and one
-            snippet per lemma, in batches; on a laptop CPU the 14B model takes
-            about 9 minutes per batch of 30 lemmas, hours for a corpus. Rows are
-            appended after every batch, so an interrupted run continues where it
-            stopped when started again.
+            snippet per lemma, in batches; this is much slower than GLiNER,
+            hours for a large corpus on a CPU. Rows are appended after every
+            batch, so an interrupted run continues where it stopped when started
+            again.
 --model overrides the chosen engine's model (an Ollama model name for llm; a
 Hugging Face id for gliner, which then uses that model's latest revision).
 

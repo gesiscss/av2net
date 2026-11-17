@@ -1,4 +1,4 @@
-# Observation source inputs (large binaries, transient per PROJECT.md; retrievable by CID)
+# Source videos (large binaries; read only in Layer 1)
 input/
 *.mp4
 
@@ -14,19 +14,6 @@ __pycache__/
 .pytest_cache/
 .venv/
 
-# Claude Code (local agent config, not part of the shared repo)
-.claude/
-
-# Project/agent instructions (kept out of the shared repo)
-CLAUDE.md
-PROJECT.md
-
 # OS / editor
 .DS_Store
 Thumbs.db
-
-# Literature
-literature/
-
-# Local design notes and research reports (kept out of the shared repo)
-docs/

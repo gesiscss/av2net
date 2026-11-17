@@ -22,13 +22,6 @@ the original stays in the span.
                 language does)
 
 A single word in capitals is left as it is: it may be an abbreviation or a logo.
-
-Measured on normally cased spans put into capitals (reference: what the
-extractors find in the original), the model lifts the noun F1 from 0.03 to 0.93
-and the name F1 from 0.67 to 0.89. A casing dictionary learned from the corpus
-reached 0.88 and 0.91, and needed the whole corpus; qwen2.5:14b, asked for the
-words that dictionary did not know, 0.95 and 0.91 at 30 s instead of 0.05 s per
-text.
 """
 
 from __future__ import annotations

@@ -7,20 +7,20 @@ reads the same subtitle several times). Ordered rules pick one reading:
     agree          all readings are the same words
     spacing        same letters, different spacing: the reading made of real
                    words wins, the recognizer's on a tie (OCR drops spaces far
-                   more often than the recognizer joins words, as in
-                   "zuersticken"; a compound such as "Hitzewelle" stays whole)
+                   more often than the recognizer joins words; a compound such
+                   as "Bahnhof" stays whole)
     lexicon        readings that are not real words drop out, if at least one
                    reading is a real word (OCR misreadings produce non-words)
     majority       the reading most reads agree on
     tie->subtitle  still tied: the subtitle wins, because the recognizer's
                    errors are real words, often heard with high confidence
-                   ("Bereiche" for "Reiche"); configurable to tie->speech
+                   ("flower" for "flour"); configurable to tie->speech
 
 Subtitle words the recognizer missed are inserted where the alignment pins them
 on both sides, if they are real words (OCR noise is not a missed word). A short
 run of differing words pinned on both sides, by aligned words of the same line
 or of the neighbouring subtitle line, is a substitution slot like any other:
-"elf" for "11", or a misheard name at the end of a line ("Kolja" for "Coria"),
+"eleven" for "11", or a misheard name at the end of a line ("Hanna" for "Anna"),
 which string similarity cannot align. Words that cannot be placed safely stay
 out of the text and are recorded as "unplaced". Every slot where
 the readings differ is kept as a WordDecision with all readings, so the merge

@@ -5,18 +5,18 @@ re-extraction). Two levels:
 
 1. Exact-normalized merge (always on): surface forms with the same normalized key
    (see normalize.py) are the same entity, regardless of type -- a string is a
-   string ("Frankreich" / "FRANKREICH" / "Frankreich,").
+   string ("France" / "FRANCE" / "France,").
 
 2. Fuzzy merge (optional): distinct keys are merged when they are edit-distance
    similar AND type-compatible. This catches OCR/spelling variants
-   ("Hühner"/"Hüthner", "Drei Atomreakto-ren"/"Drei Atomreaktoren"). It is gated
+   ("Schmidt"/"Schrnidt", "infor-mation"/"information"). It is gated
    so it never merges across name types (e.g. Person vs Organization), short
    strings never fuzzy-merge (protects "A2" vs "A3"), and clustering is by
    connected components so the result is independent of comparison order.
 
 This is lexical reconciliation only. Deciding that two *different* names denote
-one referent ("Katharina" = "Frau Reiche") is coreference/entity-linking, an
-inference produced upstream (a Layer 2 `same_as` extractor), not here.
+one referent ("Anna" = "Ms Schmidt") is coreference/entity linking, which this
+pipeline does not do.
 """
 
 from __future__ import annotations

@@ -4,7 +4,7 @@ GLiNER (default)
     GLiNER reads each text span with short category labels ("people", "job or
     role", "place", ...) and returns labelled stretches of text. A label counts
     as a vote for a noun when the labelled stretch contains exactly that one
-    noun; a stretch with several nouns ("Ministerium für Gesundheit") gives no
+    noun; a stretch with several nouns ("ministry of health") gives no
     vote, since which noun the label belongs to would need language-specific
     rules. Each lemma gets the category with the most votes over all its
     occurrences, or two when the top two tie. A lemma without a vote is
@@ -19,7 +19,7 @@ LLM
     it occurs, the noun marked in [brackets]. Lemmas are sent in batches; the
     instructions are the same in every call, so the server can reuse them. An
     item without a usable answer is asked once more; if it still has none, it
-    gets no row, so a later run asks again.
+    gets no row, so the next run asks again.
 
 This is corpus-level work (one table for all videos), so it runs outside the
 per-span extraction pipeline, in run_concept_table.py.

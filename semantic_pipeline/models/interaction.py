@@ -15,11 +15,10 @@ concepts (both are nodes; `attributes` says which kind) these are:
                co-occurrence draws on (its set/union): a single channel
                ("speech") or a combination ("ocr", "speech"). It is derived from
                the originating observations' modality, so channels beyond
-               speech/ocr (e.g. a future visuals-origin entity) flow through
-               without special-casing.
+               speech/ocr flow through without special-casing.
 
 Co-occurrence is grounded in the observation structure, never a tunable time
-window (windows are a Layer 4 analysis concern). `grounding` records which
+window (windows are a question for the analysis). `grounding` records which
 structural relation produced a co_occurs edge:
 
     same_segment   both named in one text span (by one extractor or several)

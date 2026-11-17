@@ -1,4 +1,4 @@
-"""Entity extractor (NER): the first semantic extractor.
+"""Entity extractor (NER): the names in a text span.
 
 Reads one text span and emits at most one SemanticEvent carrying the names found
 in it (one node per distinct name), each typed with a name type from ontology.py.
