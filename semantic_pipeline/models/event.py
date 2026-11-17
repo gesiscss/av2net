@@ -31,16 +31,19 @@ class Node(_Frozen):
 
     `label` is the surface form as found in the observation text (not yet
     normalized; identifier normalization and alias resolution are Layer 3's job).
-    `node_type` is the broad kind of node ("entity" for names); `category` is the
-    extractor-specific subtype (for names, a name type from ontology.py such as
-    "Person"; Layer 3 maps it to its shared category). `confidence` is the
+    `node_type` is the broad kind of node ("entity" for names, "concept" for
+    common nouns); `category` is the extractor-specific subtype (for names, a
+    name type from ontology.py such as "Person", which Layer 3 maps to its shared
+    category; for concepts, the part-of-speech tag). `lemma` is the base form
+    (concepts only); Layer 3 merges concepts by lemma. `confidence` is the
     model's score for this node, if the model gives one (GLiNER does, the LLM
-    does not).
+    and the tagger do not).
     """
 
     label: str
     node_type: str
     category: str | None = None
+    lemma: str | None = None
     confidence: float | None = None
 
 
@@ -63,7 +66,10 @@ class SemanticEvent(_Frozen):
     from ("speech", "ocr", ...). It is explicit because a channel is not always
     one modality: subtitle-corrected speech draws on OCR observations but is
     still speech. Events without it (None) get their channel from the
-    observation ids' modality. Events are immutable and created once.
+    observation ids' modality. `span_id` names the text span the event was
+    extracted from; several extractors reading one span give events with the same
+    span_id, which Layer 3 treats as one segment. `language` is the span's
+    language. Events are immutable and created once.
     """
 
     event_id: str
@@ -74,6 +80,8 @@ class SemanticEvent(_Frozen):
     t_end: float
     observation_refs: tuple[str, ...] = ()
     channel: str | None = None
+    span_id: str | None = None
+    language: str | None = None
     confidence: float | None = None
     nodes: tuple[Node, ...] = ()
     relations: tuple[Relation, ...] = ()

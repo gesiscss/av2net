@@ -46,6 +46,15 @@ class LLMEngine(Engine):
         Schema) constrains the output when the backend supports it."""
 
 
+class TruecaseEngine(Engine):
+    """A model that restores the letter case of text, whatever its case."""
+
+    @abstractmethod
+    def truecase(self, texts: Sequence[str]) -> list[str]:
+        """Each text with its letter case restored, in input order. The model
+        may also add punctuation; callers take only the letter case."""
+
+
 @dataclass(frozen=True)
 class TaggedSpan:
     """A labelled stretch of text found by a span tagger. `start`/`end` are
@@ -64,6 +73,32 @@ class SpanTaggerEngine(Engine):
     @abstractmethod
     def tag(self, text: str, labels: Sequence[str]) -> list[TaggedSpan]:
         """The labelled spans in `text`, each with the model's score."""
+
+
+@dataclass(frozen=True)
+class Token:
+    """A word found by a token tagger, with its Universal Dependencies
+    part-of-speech tag and its lemma. `start`/`end` are character offsets into
+    the tagged text. A word inside a multi-word token (German "am" = "an dem")
+    has the offsets of the whole token."""
+
+    start: int
+    end: int
+    text: str
+    upos: str
+    lemma: str
+
+
+class TokenTaggerEngine(Engine):
+    """A part-of-speech tagger and lemmatizer with models per language."""
+
+    @abstractmethod
+    def supports(self, language: str | None) -> bool:
+        """True if there is a model for `language` (an ISO code)."""
+
+    @abstractmethod
+    def tag_tokens(self, text: str, language: str | None) -> list[Token] | None:
+        """The words of `text`, tagged and lemmatized; None if `language` has no model."""
 
 
 class SemanticExtractor(ABC):

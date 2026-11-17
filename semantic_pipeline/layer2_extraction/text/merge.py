@@ -29,6 +29,9 @@ can be audited and redone.
 Where the recognizer's reading wins, quotation marks that the subtitles show at
 its edges are carried over: they mark reported speech, which the recognizer
 cannot hear and which quote attribution (who says what about whom) needs.
+Where a subtitle reading in capitals wins or is inserted, it is respelled
+(casing.py), so subtitles in capitals do not put words in capitals into the
+transcript; the decision keeps the readings as they were.
 """
 
 from __future__ import annotations
@@ -38,6 +41,7 @@ from collections import Counter
 from dataclasses import dataclass, field
 
 from ...config import TextConfig
+from .casing import Recaser
 from .lexicon import Lexicon
 from .models import WordDecision
 from .tokens import QUOTES, OcrLine, SpeechToken, Token
@@ -169,8 +173,16 @@ def _quoted(surface: str, lead: str, trail: str) -> str:
 
 
 def merge(tokens: list[SpeechToken], blocks: list[Block], lexicon: Lexicon,
-          cfg: TextConfig) -> MergeResult:
+          cfg: TextConfig, recaser: Recaser | None = None) -> MergeResult:
     """Merge the subtitle blocks into the recognizer's tokens, per segment."""
+
+    def subtitle_text(reading: _Reading, speech: _Reading | None) -> str:
+        if recaser is None:
+            return reading.text
+        surfaces = [t.surface.strip() for t in reading.tokens]
+        heard = [t.surface.strip() for t in speech.tokens] if speech is not None else None
+        return " ".join(recaser.reading(surfaces, heard))
+
     blocks = sorted(blocks, key=lambda b: (b.line.t_start, b.line.key))
     table = _SlotTable(tokens)
 
@@ -258,12 +270,13 @@ def merge(tokens: list[SpeechToken], blocks: list[Block], lexicon: Lexicon,
     n_agree = 0
 
     def emit_insert(ins: _Insert, seg: SegmentText, out: list[str]) -> None:
-        out.append(" " + ins.reading.text)
+        text = subtitle_text(ins.reading, None)
+        out.append(" " + text)
         seg.checked = True
         seg.refs.extend(ins.refs)
         tok = tokens[ins.anchor]
         seg.decisions.append(WordDecision(
-            t_start=tok.t_start, t_end=tok.t_end, action="insert", chosen=ins.reading.text,
+            t_start=tok.t_start, t_end=tok.t_end, action="insert", chosen=text,
             speech="", subtitle=tuple(ins.texts), rule="missing in speech",
             observation_refs=tuple(dict.fromkeys(ins.refs)),
         ))
@@ -295,7 +308,7 @@ def merge(tokens: list[SpeechToken], blocks: list[Block], lexicon: Lexicon,
                     parts.append(surface)
                 text = "".join(parts)
             else:
-                text = " " + chosen.text
+                text = " " + subtitle_text(chosen, speech)
                 out.append(text)
             if any(r.keys != speech.keys for r in subs):
                 seg.decisions.append(WordDecision(

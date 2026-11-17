@@ -20,12 +20,14 @@ class _Frozen(BaseModel):
 
 
 class CanonicalNode(_Frozen):
-    node_id: str                     # canonical (normalized) id
-    label: str                       # representative surface form
-    node_type: str = "entity"
-    category: str | None = None      # dominant type (for names a name type, e.g. "Person")
+    node_id: str                     # canonical id (names: normalized form; concepts: concept:<lang>:<lemma>)
+    label: str                       # representative surface form (concepts: the lemma)
+    node_type: str = "entity"        # "entity" (a name) or "concept" (a common noun)
+    category: str | None = None      # dominant type (names: a name type, e.g. "Person"; concepts: part of speech)
     categories: dict[str, int] = {}  # observed type distribution
-    meta_category: str | None = None  # the dominant type's category (ontology.py), e.g. "agent"
+    meta_category: str | None = None  # shared category (ontology.py), e.g. "agent"
+    meta_categories: tuple[str, ...] = ()  # all shared categories (a concept can have two)
+    language: str | None = None      # concepts: the language of the lemma
     mention_count: int = 0
     first_seen: float = 0.0
     last_seen: float = 0.0

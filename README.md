@@ -2,186 +2,99 @@
 
 [![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/gesiscss/av2net/main)
 
-Multimodal semantic extraction pipeline for videos. A video is treated as an
-observation process from which semantic information is extracted; the persistent
-product is a **temporal multipartite semantic network**, not a video representation.
+av2net turns videos into networks of what they talk about. It observes a video
+through speech, on-screen text and pictures, extracts the names and common nouns
+it finds, and records when each appears and which appear together. Its product
+is a **temporal multipartite semantic network** per video, which can be analysed
+without the video.
 
-## Architecture
+The user documentation is [documentation.pdf](documentation.pdf): what av2net
+does and what it can be used for, how to install and run it, how each layer
+works, every setting, the output formats, larger models on GPU machines, and the
+known limits.
 
-Four layers, communicating only through immutable, serialized objects
-(functional core, imperative shell):
+## How it works
 
-| Layer | Name | Transformation | Status |
-|-------|------|----------------|--------|
-| 1 | Observation | MP4 -> `Observation` objects | done |
-| 2 | Semantic extraction | `Observation` -> `SemanticEvent` objects | in progress (NER) |
-| 3 | Network construction | `SemanticEvent` -> `TemporalInteraction` stream + `CanonicalNetwork` | done (entities) |
-| 4 | Network analysis | analysis over the canonical network | planned |
+| Layer | Turns | into | Scripts |
+|---|---|---|---|
+| 1 Observation | the video (MP4) | sentences, on-screen text blocks, shots | [run_speech.py](run_speech.py), [run_ocr.py](run_ocr.py), [run_vision.py](run_vision.py) |
+| 2 Semantic extraction | observations | one text stream per video, then names, common nouns and their categories | [run_text.py](run_text.py), [run_ner.py](run_ner.py), [run_concepts.py](run_concepts.py), [run_concept_table.py](run_concept_table.py) |
+| 3 Network construction | semantic events | a temporal interaction stream and a canonical network | [run_network.py](run_network.py) |
 
-Two execution modes share one architecture: **local development** (CPU/consumer
-GPU, lightweight open-source models) and **production** (large GPUs, larger
-multimodal models). Only model implementations change between modes; pipeline
-logic does not.
+- **Observation.** Speech recognition with faster-whisper, on-screen text with
+  RapidOCR on ONNX Runtime, shots with PySceneDetect and their descriptions with
+  a vision-language model on a local Ollama server (optional).
+- **One text per video.** Burned-in subtitles are found from the evidence in each
+  video, wherever they sit on screen, and merged word by word into the speech
+  transcript; other on-screen text stays its own channel. Text in capitals is
+  respelled by a truecasing model before extraction. Every decision is kept for
+  audit.
+- **Names and nouns.** Names come from GLiNER (or an instruction-tuned LLM on
+  Ollama), typed as Person, Group, Organization, Place, Event, Work, Product or
+  Other. Common nouns come from Stanza, by lemma, in over 100 languages. A
+  generated table gives the nouns categories from the same set as the names:
+  agent, role, organization, location, event, task, resource, knowledge,
+  attribute and time.
+- **Network.** Co-occurrence is grounded in the observations (same piece of text,
+  pieces of text that overlap in time, same shot), never in a time window, and
+  each co-occurrence records whether it comes from speech, on-screen text or
+  both. The interaction stream is the authoritative record; the canonical
+  network is derived from it and can always be rebuilt from it.
+- **Traceable and repeatable.** Every event refers to the observations it came
+  from; every step writes a manifest with its configuration, models and versions;
+  package versions and model revisions are pinned.
+- **Replaceable models.** The defaults run on a laptop CPU. Every model sits
+  behind an interface, so larger models replace them through the configuration.
 
-## Layer 1 (Observation)
+Analysing the network is not part of av2net: the stored network files, and an
+adapter that loads them into networkx, are the interface for it.
 
-Transforms the MP4 into temporally aligned multimodal observations. Local backends:
-
-- **Speech** — Faster-Whisper
-- **OCR** — PaddleOCR (RapidOCR/ONNX fallback)
-- **Vision** — Ollama vision-language model (moondream)
-
-Run scripts: [run_speech.py](run_speech.py), [run_ocr.py](run_ocr.py),
-[run_vision.py](run_vision.py). Each writes observation streams and a per-run
-manifest into the video's data directory (see Data below).
-
-## Layer 2 (Semantic extraction)
-
-Transforms observations into a stream of `SemanticEvent`s, in two steps.
-
-**Text assembly** ([run_text.py](run_text.py)) builds the one text stream that
-every text extractor reads. Burned-in subtitles are found from the evidence in
-each video, with no screen region assumed: a layout cluster of OCR lines that,
-as a group, renders much of the speech at a stable time offset. Their readings
-are merged word by word into the speech transcript. Subtitles fix misheard words,
-add missed ones and carry quotation marks (reported speech, for quote
-attribution); the transcript fixes OCR misreadings and missing spaces; each
-utterance is read once. Multi-line subtitle blocks are read as one text.
-Disagreements are settled by ordered rules (spacing, a real-word check against a
-per-language word list, majority over OCR reads, ties to the subtitle). Other
-on-screen text (headlines, banners, credits) stays its own channel. Every decision is kept in `text_stream.jsonl` for audit;
-the stream is derived and rebuildable from the observations.
-
-**Extraction** keeps two axes separate:
-
-- **extractors** (semantic axis) - one module per semantic dimension. Entities
-  (NER) is the first; relations, sentiment, etc. are added as new modules.
-- **engines** (resource axis) - one wrapper per model/package, built once and
-  shared. NER runs on GLiNER by default (`urchade/gliner_multi-v2.1`, a
-  multilingual span-tagging model that runs on CPU, downloaded from Hugging Face
-  on first use); `--engine llm` uses an instruction-tuned LLM via Ollama
-  (`qwen2.5:3b` by default, `--model qwen2.5:14b` for the larger model).
-
-NER draws names from the text stream (speech + on-screen text) only, never
-from vision. Names are typed with the name types in
-[semantic_pipeline/ontology.py](semantic_pipeline/ontology.py) (Person, Group,
-Organization, Place, Event, Work, Product, Other); Layer 3 adds each type's
-category (agent, organization, location, ...). Common nouns will come from a
-separate concept extractor (not built yet). Run script: [run_ner.py](run_ner.py).
-
-## Layer 3 (Network construction)
-
-Turns the event stream into two representations:
-
-- **Streaming representation** (`temporal_interactions.jsonl`) - the authoritative,
-  append-only record in Holme form `(time, source, relation, target, attributes)`.
-- **Canonical network** (`canonical_network.json`) - a derived multipartite graph,
-  always rebuildable from the stream alone.
-
-This layer is descriptive (identifier normalization, alias resolution, edge
-aggregation); no graph analytics and no MP4 access (those belong to Layer 4).
-Alias resolution merges surface-form variants of one entity: exact-normalized
-always, plus optional fuzzy (edit-distance) merging that is type-gated (never
-across incompatible categories) and length-guarded (short strings match exactly),
-clustered deterministically. Deciding two *different* names co-refer
-(`Katharina` = `Frau Reiche`) is coreference/entity-linking, an upstream Layer 2
-inference, not done here.
-Co-occurrence is grounded in the observation structure, never a tunable time
-window: `same_segment` (one observation unit), `overlap` (source segments overlap
-in time), and `same_scene` (a clique within one vision shot; shot intervals are
-read from the Layer 1 vision observations). Each co-occurrence also records the
-set of observation channels it draws on (a single channel like `speech` or a
-combination like `ocr+speech`), aggregated per edge as `by_channel`. Each event
-carries its channel explicitly (subtitle-corrected speech counts as speech,
-independent on-screen text as `ocr`); events without one fall back to the
-originating observation's modality, so channels beyond speech/OCR flow through
-unchanged. Run script: [run_network.py](run_network.py).
-An optional `to_networkx()` adapter loads the canonical network for analysis
-without making `networkx` a core dependency.
-
-## Package layout
-
-```
-semantic_pipeline/
-  config.py, io.py, language.py, time_base.py, source.py
-  models/              immutable data objects (Observation, SemanticEvent,
-                       TemporalInteraction, CanonicalNetwork)
-  layer1_observation/  interfaces + local backends + streaming/segmentation
-  layer2_extraction/   interfaces, context, memory, pipeline, factory
-    text/              text assembly (alignment, subtitle tracks, lexicon, merge)
-    extractors/        semantic axis (entities, ...)
-    engines/           resource axis (shared LLM, ...)
-  layer3_network/      normalize, scenes, stream, canonical, build, adapters
-```
-
-## Data
-
-The tool processes many videos. Source videos live in `input/` (not tracked;
-large binaries). With no explicit path, each run script processes every MP4 under
-`input/` in a row.
-
-All pipeline artifacts are written under `data/<source_id>/`, one directory per
-video, and `data/` is **not tracked** (regenerable, video-specific):
-
-```
-data/<source_id>/
-  source.json                    source metadata + time anchor
-  observations.{speech,ocr,vision}.jsonl
-  text_stream.jsonl              Layer 2 assembled text, with every merge decision
-                                 (derived; rebuildable from the observations)
-  semantic_events.jsonl          Layer 2 entity events
-  temporal_interactions.jsonl    Layer 3 authoritative interaction stream
-  canonical_network.json         Layer 3 derived network (rebuildable from the stream)
-  run_manifest.{speech,ocr,vision,text,ner,network}.json
-```
-
-The tracked, non-video-specific record of how to reproduce a run is the code plus
-[environment.yml](environment.yml); the per-video manifests capture the concrete
-run (model versions, detected languages, configuration, timing).
-
-## Reproducibility
-
-[environment.yml](environment.yml) pins the full dependency stack (Python 3.13
-plus exact package versions) so the pipeline is reproducible.
-
-Create the environment locally:
+## Quick start
 
 ```
 conda env create -f environment.yml
 conda activate av2net
 ```
 
-Or launch it in the browser with no install via the Binder badge above
-(builds from `environment.yml`). In the Binder session, open a terminal, place a
-video under `input/`, and run the Layer 1 scripts.
+Put the videos (MP4) into `input/`, then run the steps in this order:
 
-Two caveats on Binder:
+```
+python run_speech.py          # speech recognition
+python run_ocr.py             # on-screen text
+python run_vision.py          # shots and picture descriptions (optional, needs Ollama)
+python run_text.py            # one text stream per video
+python run_ner.py             # names
+python run_concepts.py        # common nouns
+python run_concept_table.py   # categories for the nouns of all videos
+python run_network.py         # interaction stream and canonical network
+```
 
-- The vision backend ([run_vision.py](run_vision.py)) and the optional LLM NER
-  engine call a local **Ollama** server, which is not available on Binder.
-  Speech, OCR and GLiNER NER run fully; vision and LLM NER need a local Ollama
-  with the model pulled.
-- Binder is headless and Linux-only, so `environment.yml` uses the headless
-  OpenCV build and omits the Windows-only `pywinpty`.
+Each step processes every video and writes to `data/<video>/`; the network is
+`data/<video>/canonical_network.json`. Models are downloaded on first use. The
+optional parts (picture descriptions, LLM options) need a local
+[Ollama](https://ollama.com) server with the models pulled.
 
-## Open issues
+**In the browser.** The Binder badge above builds the environment with no
+installation. Ollama is not available there, so the picture descriptions and the
+LLM options do not run; everything else does.
 
-Found on a test set of 53 videos; kept for later work.
+## Repository
 
-- **NER quality is not evaluated yet.** GLiNER tags some common nouns as names
-  ("Markt" as Place, "Unfall" as Event) and keeps titles inside person names
-  ("Dr. Jonas Weber"). The earlier LLM run (qwen2.5:3b) missed obvious names in
-  some videos and returned dates, titles and OCR misspellings. A comparison
-  against a hand-annotated sample is planned.
-- **On-screen text dominates the network.** Every entity in one OCR unit
-  co-occurs with every other, so a single text-heavy screen can contribute
-  hundreds of edges (about 90% of the co-occurrence weight overall). Layer 4
-  should analyse channels separately, or Layer 3 should link OCR entities per
-  line.
-- **Sticker overlays** in the subtitle band can hide a subtitle track.
-- **Karaoke captions:** OCR samples every 0.5 s, so it sees about half of the
-  words.
-- **Non-Latin on-screen text** (e.g. Hebrew) is read with the Latin OCR model.
-- **Shortened subtitles** can replace the spoken word on a tie ("Videoreihe"
-  becomes "Reihe").
+```
+run_*.py              the steps of the pipeline
+semantic_pipeline/    the package: layer1_observation, layer2_extraction,
+                      layer3_network, models, config.py (all settings),
+                      ontology.py (categories and name types)
+tests/                tests (python -m pytest tests)
+environment.yml       the pinned environment (Python 3.13)
+documentation.pdf     the user documentation
+```
 
+## License and citation
+
+av2net is developed by GESIS - Leibniz Institute for the Social Sciences and is
+licensed under the [Apache License 2.0](LICENSE) (see also [NOTICE](NOTICE)). To
+cite it, use [CITATION.cff](CITATION.cff). The models av2net downloads and runs
+(speech, text and name recognition, tagging, truecasing, the Ollama models) come
+with their own licenses, and some restrict commercial use, for example
+`qwen2.5:3b`, the default model of the LLM options.

@@ -9,19 +9,23 @@ Two levels:
   category.
 
 Names (node_type "entity") are specific nodes; common nouns (node_type
-"concept", not yet extracted) will be generic nodes. AutoMap's specific/generic
-distinction is therefore carried by node_type.
+"concept") are generic nodes. AutoMap's specific/generic distinction is
+therefore carried by node_type.
 
 Layer 2 records the name type; Layer 3 maps it to its category (ontology mapping
 belongs to Layer 3), so changing the mapping never requires re-running
-extraction. Everything here is domain-general and language-agnostic: the
-definitions are in English and nothing depends on one language's spelling.
+extraction. Common nouns get their categories from the generated category table
+(concept_table.py), which Layer 3 applies. Everything here is domain-general
+and language-agnostic: the definitions are in English and nothing depends on
+one language's spelling.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+ENTITY = "entity"
+CONCEPT = "concept"
 UNASSIGNED = "unassigned"
 
 CATEGORIES: dict[str, str] = {
@@ -37,6 +41,27 @@ CATEGORIES: dict[str, str] = {
     "time": "A period or point in time.",
     UNASSIGNED: "Not categorized yet, or fits no category.",
 }
+
+# Common-noun examples per category, in several languages and from several
+# domains (docs/node-types.md, section 3). Shown to models that assign categories.
+CATEGORY_EXAMPLES: dict[str, str] = {
+    "agent": "child, Nachbarin, fans, público",
+    "role": "teacher, Trainerin, médico, moderator",
+    "organization": "company, Verein, entreprise, team",
+    "location": "city, Strand, cocina, station",
+    "event": "concert, Unfall, boda, storm",
+    "task": "training, Reparatur, compra, cleaning",
+    "resource": "money, Auto, agua, medicine",
+    "knowledge": "study, Rezept, idioma, mathematics",
+    "attribute": "age, Gesundheit, courage, taille",
+    "time": "summer, Woche, futuro, evening",
+}
+
+# The agreed rule separating the two person categories (docs/node-types.md, section 3).
+AGENT_ROLE_RULE = (
+    "Nouns for occupations and functions are role; nouns that describe people in other "
+    "ways (age, relation, residence, fandom) are agent."
+)
 
 
 @dataclass(frozen=True)

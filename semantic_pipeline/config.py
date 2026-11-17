@@ -135,6 +135,72 @@ class NERConfig:
 
 
 @dataclass(frozen=True)
+class StanzaConfig:
+    """A Stanza pipeline: tokenizer, part-of-speech tagger and lemmatizer.
+
+    Stanza has models for over 100 languages, all tagged with the Universal
+    Dependencies part-of-speech set, so the same code serves every language. One
+    pipeline is built per language, on first use, from the language each text
+    span records. The installed Stanza version fixes the model files (its
+    resources version), so pinning the package pins the models.
+    """
+
+    processors: tuple[str, ...] = ("tokenize", "mwt", "pos", "lemma")  # mwt only where it exists
+    package: str = "default"        # Stanza's default model package per language
+    device: str = "cpu"
+    model_dir: str | None = None    # None = Stanza's default model cache
+
+
+@dataclass(frozen=True)
+class ConceptConfig:
+    """The concept extractor: every common noun in the text, by lemma, with no
+    salience judgment. Proper nouns are left to NER. Categories are not assigned
+    here; Layer 3 takes them from the generated category table."""
+
+    enabled: bool = True
+    upos: tuple[str, ...] = ("NOUN",)   # Universal Dependencies tags taken as concepts
+
+
+@dataclass(frozen=True)
+class ConceptCategoryConfig:
+    """How the generated category table is filled (run_concept_table.py).
+
+    Two engines can fill it, as for NER; each writes its own table file:
+
+    * "gliner" (default): GLiNER labels each noun occurrence with category
+      words; a label counts only when the labelled stretch contains exactly one
+      noun. Each lemma gets the category with the most votes over its
+      occurrences, or two when they tie; lemmas without a vote are unassigned.
+      The label wording was chosen on a handful of sentences in three languages.
+    * "llm": the shared instruction-tuned LLM (LLMConfig; --model overrides it)
+      reads the category definitions with examples in several languages and
+      assigns each lemma one category, or two if ambiguous, from one snippet
+      where it occurs. Lemmas are sent in batches.
+
+    Which engine works better is not evaluated yet.
+    """
+
+    engine: str = "gliner"          # "gliner" | "llm"
+    gliner_labels: tuple[tuple[str, str], ...] = (
+        ("people", "agent"),
+        ("job or role", "role"),
+        ("organization", "organization"),
+        ("place", "location"),
+        ("event", "event"),
+        ("activity", "task"),
+        ("object or material", "resource"),
+        ("information or idea", "knowledge"),
+        ("quality or state", "attribute"),
+        ("time", "time"),
+    )
+    threshold: float = 0.3          # minimum GLiNER score for a category label
+    max_categories: int = 2
+    llm_batch_size: int = 30        # lemmas per LLM call
+    snippet_chars: int = 40         # LLM context: characters on each side of the noun,
+                                    # extended to whole words
+
+
+@dataclass(frozen=True)
 class TextConfig:
     """Layer 2 text assembly: speech + OCR observations -> one text stream.
 
@@ -180,6 +246,23 @@ class TextConfig:
     compound_part_min_len: int = 4
     compound_part_min_zipf: float = 2.5
     compound_part_max_zipf: float = 6.0   # function words (sind, der) are no compound parts
+    # Text in capitals is respelled by a truecasing model before any extractor
+    # reads it (see layer2_extraction/text/casing.py and TruecaseConfig).
+    recase: bool = True
+    recase_share_min: float = 0.7         # text is in capitals from this share of its words
+    recase_min_words: int = 2             # ... counting words of two or more letters
+
+
+@dataclass(frozen=True)
+class TruecaseConfig:
+    """A model that restores letter case (and punctuation, which is not used) in
+    lower-case text: an XLM-RoBERTa model trained on 47 languages, run on CPU
+    with ONNX Runtime through the punctuators package. Text assembly uses it for
+    text in capitals. The model revision is pinned so that a run can be repeated.
+    """
+
+    model: str = "1-800-BAD-CODE/xlm-roberta_punctuation_fullstop_truecase"
+    revision: str = "d1769a597ce8dfaa070d436bc67d4ee761f58884"
 
 
 @dataclass(frozen=True)
@@ -187,9 +270,13 @@ class ExtractionConfig:
     """Layer 2 configuration: text assembly, shared engines, per-extractor settings."""
 
     text: TextConfig = field(default_factory=TextConfig)
+    truecase: TruecaseConfig = field(default_factory=TruecaseConfig)
     llm: LLMConfig = field(default_factory=LLMConfig)
     gliner: GlinerConfig = field(default_factory=GlinerConfig)
+    stanza: StanzaConfig = field(default_factory=StanzaConfig)
     ner: NERConfig = field(default_factory=NERConfig)
+    concepts: ConceptConfig = field(default_factory=ConceptConfig)
+    concept_categories: ConceptCategoryConfig = field(default_factory=ConceptCategoryConfig)
 
 
 @dataclass(frozen=True)

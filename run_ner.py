@@ -35,6 +35,7 @@ from run_common import DEFAULT_DATA_DIR, discover_run_dirs, pkg, run_dir
 from semantic_pipeline.config import Config
 from semantic_pipeline.io import read_jsonl, write_json, write_jsonl
 from semantic_pipeline.layer2_extraction.context import TextSpan
+from semantic_pipeline.layer2_extraction.extractors.entities import EXTRACTOR_NAME
 from semantic_pipeline.layer2_extraction.factory import build_extractors
 from semantic_pipeline.layer2_extraction.memory import EpisodicMemory
 from semantic_pipeline.layer2_extraction.pipeline import extract_events
@@ -118,8 +119,9 @@ def main() -> None:
             ext = replace(ext, gliner=replace(ext.gliner, model=args.model, revision=None))
     config = replace(config, extraction=ext)
 
-    # Build the shared engine + extractors once; reuse across all videos.
-    extractors, engines = build_extractors(config.extraction)
+    # Build the shared engine + extractor once; reuse across all videos.
+    # Concepts are a separate step (run_concepts.py).
+    extractors, engines = build_extractors(config.extraction, names=(EXTRACTOR_NAME,))
     print(f"Processing {len(run_dirs)} video(s); NER engine {ext.ner.engine}: "
           f"{', '.join(e.model_id for e in extractors)}")
     for rd in run_dirs:

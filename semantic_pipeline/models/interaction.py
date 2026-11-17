@@ -5,11 +5,11 @@ immutable stream of temporal interactions in Holme's form
 
     (time, source node, relation, target node, attributes)
 
-Each Layer 2 semantic event generates one or more interactions. For the entity
-extractor these are:
+Each Layer 2 semantic event generates one or more interactions. For names and
+concepts (both are nodes; `attributes` says which kind) these are:
 
-    appears    a single entity is mentioned at a time (unary; target_node is None)
-    co_occurs  two entities are mentioned together (symmetric; stored once per
+    appears    a single node is mentioned at a time (unary; target_node is None)
+    co_occurs  two nodes are mentioned together (symmetric; stored once per
                unordered pair per occurrence, source_node <= target_node).
                `channels` records the distinct observation channels the
                co-occurrence draws on (its set/union): a single channel
@@ -22,14 +22,16 @@ Co-occurrence is grounded in the observation structure, never a tunable time
 window (windows are a Layer 4 analysis concern). `grounding` records which
 structural relation produced a co_occurs edge:
 
-    same_segment   both entities named in one observation unit (one event)
-    overlap        their source segments overlap in real time (e.g. speech + OCR)
+    same_segment   both named in one text span (by one extractor or several)
+    overlap        their source spans overlap in real time (e.g. speech + OCR)
     same_scene     both named within the same vision shot (a clique per scene)
 
-Nodes are opaque canonical ids (normalized surface forms); the network stays
+Nodes are opaque canonical ids (normalized surface forms for names,
+concept:<language>:<lemma> for concepts); the network stays
 modality-independent. Provenance travels in `event_refs` / `observation_refs`, and
-`attributes` carries small extras (e.g. the observed surface label and category)
-so the canonical network is fully rebuildable from this stream alone.
+`attributes` carries small extras (the observed surface label and category; for
+concepts also node_type, lemma, language and the table's categories) so the
+canonical network is fully rebuildable from this stream alone.
 """
 
 from __future__ import annotations

@@ -12,7 +12,7 @@ import pytest
 from semantic_pipeline.config import TextConfig
 from semantic_pipeline.layer2_extraction.context import TextSpan
 from semantic_pipeline.layer2_extraction.extractors.entities import LLMEntityExtractor
-from semantic_pipeline.layer2_extraction.interfaces import LLMEngine
+from semantic_pipeline.layer2_extraction.interfaces import LLMEngine, TruecaseEngine
 from semantic_pipeline.layer2_extraction.memory import EpisodicMemory
 from semantic_pipeline.layer2_extraction.text import assemble, build_lexicon
 from semantic_pipeline.layer2_extraction.text.lexicon import Lexicon
@@ -66,8 +66,25 @@ def unit(idx: int, t0: float, t1: float, *lines: tuple[str, tuple]) -> OCRObserv
     )
 
 
-def run(speech, ocr, words=()):
-    return assemble(speech, ocr, cfg=TextConfig(), frame_size=FRAME, lexicon=SetLexicon(words))
+class FakeTruecaser(TruecaseEngine):
+    """Answers from a table keyed by the lower-case text; other texts come back in lower case."""
+
+    def __init__(self, answers=None):
+        self.answers = dict(answers or {})
+        self.calls: list[list[str]] = []
+
+    @property
+    def model_id(self) -> str:
+        return "fake"
+
+    def truecase(self, texts):
+        self.calls.append(list(texts))
+        return [self.answers.get(t.lower(), t.lower()) for t in texts]
+
+
+def run(speech, ocr, words=(), truecaser=None):
+    return assemble(speech, ocr, cfg=TextConfig(), frame_size=FRAME, lexicon=SetLexicon(words),
+                    truecaser=truecaser or FakeTruecaser())
 
 
 def speech_texts(stream) -> list[str]:
@@ -136,7 +153,8 @@ def test_tie_break_can_favour_speech():
     ocr = [unit(0, 0.0, 0.4, ("Reiche", SUB)), unit(1, 0.4, 1.2, ("heute einmal", SUB)),
            unit(2, 1.2, 2.0, ("einen Blick", SUB))]
     cfg = TextConfig(tie_break="speech")
-    stream = assemble(speech, ocr, cfg=cfg, frame_size=FRAME, lexicon=SetLexicon({"reiche", "bereiche"}))
+    stream = assemble(speech, ocr, cfg=cfg, frame_size=FRAME, lexicon=SetLexicon({"reiche", "bereiche"}),
+                      truecaser=FakeTruecaser())
     assert speech_texts(stream) == ["Bereiche heute einmal einen Blick"]
 
 
@@ -296,7 +314,7 @@ def test_a_fragment_cannot_substitute_longer_words():
     stream = run(speech, ocr, words=words)
     assert speech_texts(stream) == ["die als gebrannt werden mit dem Verbot"]
     unchecked = assemble(speech, ocr, cfg=TextConfig(substitution_length_ratio_min=0.0),
-                         frame_size=FRAME, lexicon=SetLexicon(words))
+                         frame_size=FRAME, lexicon=SetLexicon(words), truecaser=FakeTruecaser())
     assert speech_texts(unchecked) != speech_texts(stream)   # the length check is what prevents it
 
 
@@ -314,6 +332,47 @@ def test_assembly_is_deterministic():
            unit(2, 1.2, 2.0, ("einen Blick", SUB)), unit(3, 0.0, 2.0, ("Ausland", BANNER))]
     a, b = run(speech, ocr), run(speech, list(reversed(ocr)))
     assert a.spans == b.spans and a.diagnostics == b.diagnostics
+
+
+def test_subtitles_in_capitals_keep_the_transcript_in_normal_case():
+    speech = [seg(0, timed("Bereiche heute einmal einen Blick in die Realität waren.", 0.0))]
+    ocr = [unit(0, 0.0, 0.8, ("„REICHE,", SUB)),
+           unit(1, 0.8, 2.0, ("HEUTE EINMAL EINEN BLICK", SUB)),
+           unit(2, 2.0, 3.2, ("IN DIE REALITÄT WAGEN.", SUB))]
+    truecaser = FakeTruecaser()
+    stream = run(speech, ocr, words={"reiche", "bereiche", "wagen", "waren"}, truecaser=truecaser)
+
+    # Agreeing words keep the recognizer's spelling; the winning subtitle readings
+    # take their capital from the recognizer's reading ("Bereiche" -> "Reiche").
+    assert speech_texts(stream) == ["„Reiche, heute einmal einen Blick in die Realität wagen."]
+    assert [(d.speech, d.chosen, d.subtitle) for d in decisions(stream)] == [
+        ("Bereiche", "„Reiche,", ("„REICHE,",)), ("waren.", "wagen.", ("WAGEN.",))]
+    assert stream.diagnostics["recase"]["subtitle_words_respelled"] == 2
+    assert truecaser.calls == []                 # the merge needs no model
+
+
+def test_onscreen_text_in_capitals_is_respelled_and_keeps_the_original():
+    ocr = [unit(0, 0.0, 3.0, ("THORSTEN BECHERER", HEAD), ("BUNDESTAGSKANDIDAT", BANNER)),
+           unit(1, 3.0, 4.0, ("Live aus Berlin", HEAD))]
+    truecaser = FakeTruecaser({"thorsten becherer\nbundestagskandidat": "Thorsten Becherer, Bundestagskandidat."})
+    stream = run([], ocr, truecaser=truecaser)
+
+    head, live = stream.spans
+    assert head.text == "Thorsten Becherer\nBundestagskandidat"
+    assert head.original_text == "THORSTEN BECHERER\nBUNDESTAGSKANDIDAT"
+    assert live.original_text is None
+    assert stream.diagnostics["recase"]["model"] == "fake"
+    assert stream.diagnostics["recase"]["onscreen_spans_respelled"] == 1
+
+    off = assemble([], ocr, cfg=TextConfig(recase=False), frame_size=FRAME, lexicon=SetLexicon())
+    assert off.spans[0].text == "THORSTEN BECHERER\nBUNDESTAGSKANDIDAT"
+    assert off.diagnostics["recase"] == {"enabled": False}
+
+
+def test_respelling_needs_a_truecasing_engine():
+    with pytest.raises(ValueError, match="needs a truecasing engine"):
+        assemble([], [unit(0, 0.0, 1.0, ("WAHL IN SASSNITZ", HEAD))], cfg=TextConfig(),
+                 frame_size=FRAME, lexicon=SetLexicon())
 
 
 def test_wordfreq_lexicon_with_german_compounds():

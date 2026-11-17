@@ -2,7 +2,7 @@
 
 Reads one text span and emits at most one SemanticEvent carrying the names found
 in it (one node per distinct name), each typed with a name type from ontology.py.
-Common nouns are not names; they will come from a separate concept extractor.
+Common nouns are not names; they come from the concept extractor (concepts.py).
 NER draws names from the text channels only; person identity is never inferred
 from vision (that would be a separate cross-modal extractor). Alias merging and
 the mapping from name type to category are Layer 3's job, so this extractor
@@ -27,7 +27,7 @@ from typing import Iterable
 
 from ...config import NERConfig
 from ...models.event import Node, SemanticEvent
-from ...ontology import NAME_TYPES, TYPE_NAMES, name_type
+from ...ontology import ENTITY, NAME_TYPES, TYPE_NAMES, name_type
 from ..context import TextSpan
 from ..interfaces import LLMEngine, SemanticExtractor, SpanTaggerEngine
 from ..memory import EpisodicMemory
@@ -73,7 +73,7 @@ def _entity_event(
         key = (" ".join(text.casefold().split()), typ)
         previous = nodes.get(key)
         if previous is None:
-            nodes[key] = Node(label=text, node_type="entity", category=typ, confidence=score)
+            nodes[key] = Node(label=text, node_type=ENTITY, category=typ, confidence=score)
             memory.note_entity(text, span.t_end)
         elif score is not None and (previous.confidence is None or score > previous.confidence):
             nodes[key] = previous.model_copy(update={"confidence": score})
@@ -90,6 +90,8 @@ def _entity_event(
             t_end=span.t_end,
             observation_refs=span.observation_refs or (span.observation_id,),
             channel=span.channel,
+            span_id=span.span_id,
+            language=span.language,
             confidence=None,  # scores, where a model gives them, sit on the nodes
             nodes=tuple(nodes.values()),
         )
