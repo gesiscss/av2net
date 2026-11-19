@@ -40,7 +40,7 @@ from dataclasses import dataclass
 from ...config import TextConfig
 from .align import LineAlignment, SpeechIndex, align_line
 from .lexicon import Lexicon
-from .tokens import OcrLine, Token, split_tokens
+from .tokens import OcrLine, Token, key_of, rejoin, split_tokens
 
 SUBTITLE = "subtitle"
 ONSCREEN = "onscreen"
@@ -177,14 +177,14 @@ def _stack_rows(rows: list[_Row], cfg: TextConfig) -> list[list[_Row]]:
 
 def _join_line_breaks(lines: list[tuple[Token, ...]], lexicon: Lexicon) -> tuple[Token, ...]:
     """A block's tokens in reading order, rejoining a word hyphenated across a
-    line break when the joined form is a real word."""
+    line break when the joined form is a real word (tokens.rejoin)."""
     out: list[Token] = []
     for tokens in lines:
         tokens = list(tokens)
         if out and tokens:
-            a, b = out[-1], tokens[0]
-            if a.surface.rstrip().endswith(("-", "‐", "–")) and lexicon.is_word(a.key + b.key):
-                out[-1] = Token(a.surface.rstrip().rstrip("-‐–") + b.surface, a.key + b.key)
+            joined = rejoin(out[-1].surface, tokens[0].surface, lexicon.is_word)
+            if joined is not None:
+                out[-1] = Token(joined, key_of(joined))
                 tokens = tokens[1:]
         out.extend(tokens)
     return tuple(out)

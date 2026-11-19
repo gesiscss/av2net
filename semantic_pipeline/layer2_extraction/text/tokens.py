@@ -36,6 +36,53 @@ def split_tokens(text: str) -> tuple[Token, ...]:
     return tuple(Token(raw, k) for raw in text.split() if (k := key_of(raw)))
 
 
+HYPHENS = ("-", "‐", "–")
+
+
+def rejoin(left: str, right: str, is_word) -> str | None:
+    """A word hyphenated at a line end, written whole again. `left` is the last
+    word of a line and ends in a hyphen; `right` is the first word of the next
+    line. They are joined when the joined form is a real word (`is_word` takes a
+    comparison key): without the hyphen ("Vertre-" + "tern" -> "Vertretern"),
+    or keeping it when the rest starts with a capital and is not all capitals
+    ("Tech-" + "Unternehmen" -> "Tech-Unternehmen"). None if not joined."""
+    left = left.rstrip()
+    if not left.endswith(HYPHENS):
+        return None
+    stem = left.rstrip("".join(HYPHENS))
+    if not stem or not right or not right[0].isalpha() or not any(c.isalpha() for c in stem):
+        return None
+    if not is_word(key_of(stem + right)):
+        return None
+    if right[0].isupper() and not right.isupper():
+        return left + right
+    return stem + right
+
+
+_LAST_WORD = re.compile(r"(\S+)\s*$")
+_FIRST_WORD = re.compile(r"\s*(\S+)")
+
+
+def rejoin_line_breaks(text: str, is_word) -> tuple[str, int]:
+    """The text with each word hyphenated at a line end written whole again
+    (see `rejoin`), on the line where it starts; and how many were joined."""
+    out: list[str] = []
+    joined = 0
+    for line in text.split("\n"):
+        if out:
+            left, right = _LAST_WORD.search(out[-1]), _FIRST_WORD.match(line)
+            if left and right:
+                word = rejoin(left.group(1), right.group(1), is_word)
+                if word is not None:
+                    out[-1] = out[-1][:left.start(1)] + word
+                    line = line[right.end(1):].lstrip()
+                    joined += 1
+                    if not line:
+                        continue
+        out.append(line)
+    return "\n".join(out), joined
+
+
 @dataclass(frozen=True)
 class SpeechToken:
     index: int          # position in the video's whole speech token stream

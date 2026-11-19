@@ -16,7 +16,7 @@ from semantic_pipeline.layer2_extraction.interfaces import LLMEngine, TruecaseEn
 from semantic_pipeline.layer2_extraction.memory import EpisodicMemory
 from semantic_pipeline.layer2_extraction.text import assemble, build_lexicon
 from semantic_pipeline.layer2_extraction.text.lexicon import Lexicon
-from semantic_pipeline.layer2_extraction.text.tokens import split_tokens
+from semantic_pipeline.layer2_extraction.text.tokens import rejoin_line_breaks, split_tokens
 from semantic_pipeline.layer2_extraction.text.tracks import _join_line_breaks
 from semantic_pipeline.layer3_network.stream import _event_channels
 from semantic_pipeline.config import NERConfig
@@ -295,13 +295,28 @@ def test_block_context_pins_short_lines_and_edge_substitution():
 
 
 def test_only_hyphenated_line_breaks_are_rejoined():
-    lex = SetLexicon({"verfassungsgericht", "vereinsverbote"})
+    lex = SetLexicon({"verfassungsgericht", "vereinsverbote", "techunternehmen", "vertretern"})
 
     def join(*lines):
         return [t.surface for t in _join_line_breaks([split_tokens(ln) for ln in lines], lex)]
 
     assert join("Das Verfassungs-", "gericht prüft") == ["Das", "Verfassungsgericht", "prüft"]
     assert join("VEREINSVERBOT", "E") == ["VEREINSVERBOT", "E"]     # no hyphen: left alone
+    assert join("die Tech-", "Unternehmen") == ["die", "Tech-Unternehmen"]   # capital: hyphen stays
+    assert join("DIE VERTRE-", "TERN") == ["DIE", "VERTRETERN"]      # all capitals: no case signal
+    assert join("gesell-", "der") == ["gesell-", "der"]              # not a word: left apart
+
+
+def test_on_screen_words_broken_at_a_line_end_are_written_whole():
+    is_word = {"vertretern", "techunternehmen"}.__contains__
+    text = "Die Vertre-\ntern der Tech-\nUnternehmen\nund Kranken- und Pflegekassen"
+    assert rejoin_line_breaks(text, is_word) == (
+        "Die Vertretern\nder Tech-Unternehmen\nund Kranken- und Pflegekassen", 2)
+    stream = run([], [unit(0, 0.0, 3.0, ("Die Vertre-", HEAD), ("tern sind da", BANNER))],
+                 words={"vertretern"})
+    (span,) = [s for s in stream.spans if s.origin == "onscreen"]
+    assert (span.text, span.original_text) == ("Die Vertretern\nsind da", "Die Vertre-\ntern sind da")
+    assert stream.diagnostics["lines"]["onscreen_words_rejoined"] == 1
 
 
 def test_a_fragment_cannot_substitute_longer_words():

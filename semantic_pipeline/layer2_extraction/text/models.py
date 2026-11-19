@@ -59,5 +59,6 @@ class TextSpan(_Frozen):
     confidence: float | None = None
     read_aloud: bool = False               # on-screen text the speaker reads out
     decisions: tuple[WordDecision, ...] = ()
-    original_text: str | None = None       # on-screen text before respelling text in
-                                           # capitals (see casing.py); None if unchanged
+    original_text: str | None = None       # on-screen text as read, when respelling text in
+                                           # capitals (casing.py) or rejoining words broken
+                                           # at a line end changed it; None if unchanged

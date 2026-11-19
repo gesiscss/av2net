@@ -30,7 +30,7 @@ from .casing import Recaser
 from .lexicon import Lexicon, build_lexicon
 from .merge import merge
 from .models import TextSpan
-from .tokens import ocr_lines, speech_tokens
+from .tokens import ocr_lines, rejoin_line_breaks, speech_tokens
 from .tracks import ONSCREEN, SUBTITLE, classify_lines, layout_clusters, score_tracks
 
 if TYPE_CHECKING:  # interfaces imports the text package
@@ -96,15 +96,20 @@ def assemble(
         screens.append((uid, lns, "\n".join(ln.text.strip() for ln in lns)))
     texts = [text for *_, text in screens]
     respelled_all = recaser.onscreen(texts) if recaser else [None] * len(texts)
+    n_rejoined = 0
     for (uid, lns, text), respelled in zip(screens, respelled_all):
         u = units[uid]
+        # Words hyphenated at a line end are written whole again, as in subtitle
+        # blocks; after respelling, so that letter case can decide the hyphen.
+        final, joined = rejoin_line_breaks(respelled or text, lexicon.is_word)
+        n_rejoined += joined
         spans.append(TextSpan(
             span_id=f"{uid}:onscreen", source_id=u.source_id, t_start=u.t_start, t_end=u.t_end,
-            text=respelled or text, channel="ocr", origin="onscreen",
+            text=final, channel="ocr", origin="onscreen",
             observation_id=uid, observation_refs=(uid,), region=u.region,
             language=u.language, confidence=u.confidence,
             read_aloud=any(classes[ln.key].read_aloud for ln in lns),
-            original_text=text if respelled else None,
+            original_text=text if final != text else None,
         ))
 
     # Deterministic chronological order; ties broken by channel then id.
@@ -131,11 +136,12 @@ def assemble(
             "onscreen_in_subtitle_band": sum(1 for ln in lines if classes[ln.key].kind == ONSCREEN
                                              and classes[ln.key].track_id is not None),
             "onscreen_read_aloud": sum(1 for ln in lines if classes[ln.key].read_aloud),
+            "onscreen_words_rejoined": n_rejoined,
         },
         "spans": dict(sorted(Counter(s.origin for s in spans).items())),
         "slots_agreeing": merged.n_agree,
         "decisions": dict(sorted(decisions.items())),
-        "recase": _recase_diagnostics(recaser, spans),
+        "recase": _recase_diagnostics(recaser, sum(1 for r in respelled_all if r)),
     }
     return TextStream(tuple(spans), diagnostics)
 
@@ -148,9 +154,9 @@ def _recaser(cfg: TextConfig, truecaser: TruecaseEngine | None) -> Recaser | Non
     return Recaser(truecaser, share_min=cfg.recase_share_min, min_words=cfg.recase_min_words)
 
 
-def _recase_diagnostics(recaser: Recaser | None, spans: list[TextSpan]) -> dict:
+def _recase_diagnostics(recaser: Recaser | None, n_respelled: int) -> dict:
     if recaser is None:
         return {"enabled": False}
     return {"enabled": True, "model": recaser.engine.model_id,
-            "onscreen_spans_respelled": sum(s.original_text is not None for s in spans),
+            "onscreen_spans_respelled": n_respelled,
             **dict(sorted(recaser.stats.items()))}
