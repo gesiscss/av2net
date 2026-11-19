@@ -13,6 +13,10 @@ from the (authoritative) interaction stream with no video and no re-extraction:
             Both: mention count, first/last seen.
     edges   aggregated co-occurrence: total weight, per-grounding breakdown,
             first/last seen
+    relations  aggregated clauses (directed): one per source, target, verb and
+            negation, with the number of clauses (and of passives among them),
+            the frame, the meta-matrix cell of the two nodes' categories
+            ("agent->knowledge"), channels and first/last seen
 
 No graph analytics here (that is the analysis's job); this only groups and counts.
 """
@@ -22,7 +26,7 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 
 from ..models.interaction import TemporalInteraction
-from ..models.network import CanonicalEdge, CanonicalNetwork, CanonicalNode
+from ..models.network import CanonicalEdge, CanonicalNetwork, CanonicalNode, CanonicalRelation
 from ..ontology import CONCEPT, ENTITY, UNASSIGNED, category_of
 
 
@@ -51,6 +55,14 @@ def build_canonical(source_id: str, interactions: list[TemporalInteraction]) -> 
     edge_channel: dict[tuple[str, str], Counter] = defaultdict(Counter)
     edge_first: dict[tuple[str, str], float] = {}
     edge_last: dict[tuple[str, str], float] = {}
+
+    # Clauses, keyed by (source, target, verb, negated).
+    rel_weight: Counter = Counter()
+    rel_passive: Counter = Counter()
+    rel_frames: dict[tuple, Counter] = defaultdict(Counter)
+    rel_channel: dict[tuple, Counter] = defaultdict(Counter)
+    rel_first: dict[tuple, float] = {}
+    rel_last: dict[tuple, float] = {}
 
     for it in interactions:
         if it.relation == "appears":
@@ -82,6 +94,17 @@ def build_canonical(source_id: str, interactions: list[TemporalInteraction]) -> 
             edge_channel[key]["+".join(it.channels) if it.channels else "unknown"] += 1
             edge_first[key] = min(edge_first.get(key, it.t_start), it.t_start)
             edge_last[key] = max(edge_last.get(key, it.t_end), it.t_end)
+        elif it.grounding == "clause" and it.target_node is not None:
+            a = it.attributes
+            key = (it.source_node, it.target_node, it.relation, bool(a.get("negated")))
+            touch(it.source_node, it.t_start, it.t_end)
+            touch(it.target_node, it.t_start, it.t_end)
+            rel_weight[key] += 1
+            rel_passive[key] += bool(a.get("passive"))
+            rel_frames[key][a.get("frame", "object")] += 1
+            rel_channel[key]["+".join(it.channels) if it.channels else "unknown"] += 1
+            rel_first[key] = min(rel_first.get(key, it.t_start), it.t_start)
+            rel_last[key] = max(rel_last.get(key, it.t_end), it.t_end)
 
     def best(counter: Counter, default=None):
         if not counter:
@@ -135,6 +158,25 @@ def build_canonical(source_id: str, interactions: list[TemporalInteraction]) -> 
         for (s, t) in sorted(edge_weight)
     )
 
+    category = {n.node_id: n.meta_category for n in nodes}
+    relations = tuple(
+        CanonicalRelation(
+            source=s,
+            target=t,
+            relation=verb,
+            negated=negated,
+            frame=best(rel_frames[(s, t, verb, negated)], default="object"),
+            weight=int(rel_weight[(s, t, verb, negated)]),
+            passive=int(rel_passive[(s, t, verb, negated)]),
+            cell=f"{category.get(s)}->{category.get(t)}",
+            by_channel=dict(rel_channel[(s, t, verb, negated)]),
+            first_seen=rel_first[(s, t, verb, negated)],
+            last_seen=rel_last[(s, t, verb, negated)],
+        )
+        for (s, t, verb, negated) in sorted(rel_weight)
+    )
+
     return CanonicalNetwork(
-        source_id=source_id, nodes=nodes, edges=edges, n_interactions=len(interactions)
+        source_id=source_id, nodes=nodes, edges=edges, n_interactions=len(interactions),
+        relations=relations,
     )

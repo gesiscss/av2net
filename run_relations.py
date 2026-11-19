@@ -11,9 +11,9 @@ object or predicate noun ("X is Y"), labelled with the verb; both ends must be
 a name or a concept (see layer2_extraction/extractors/relations.py). By default
 only speech is read; --channels speech ocr adds on-screen text. --without
 relative_pronouns switches off the one rule that adds edges beyond plain
-clauses, for an ablation. The network (run_network.py) does not read relation
-events yet. With no --source-id, every video under data/ with a text stream is
-processed in a row.
+clauses, for an ablation. run_network.py turns the relations into directed,
+verb-labelled edges. With no --source-id, every video under data/ with a text
+stream is processed in a row.
 
 Usage:
     python run_relations.py [--datadir data] [--source-id ID ...] [--channels speech [ocr]]

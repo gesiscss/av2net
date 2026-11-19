@@ -5,9 +5,10 @@ reproducible from) the temporal interaction stream. Construction is descriptive
 node reconciliation and edge aggregation only, no interpretation and no graph
 analytics (those belong to the analysis).
 
-Nodes are reconciled entities; edges are aggregated co-occurrences. Every field is
-an aggregate over the stream, so rebuilding from a new/extended stream requires no
-video and no re-extraction.
+Nodes are reconciled entities; edges are aggregated co-occurrences (undirected);
+relations are aggregated clauses (directed, labelled with the verb). Every field
+is an aggregate over the stream, so rebuilding from a new/extended stream
+requires no video and no re-extraction.
 """
 
 from __future__ import annotations
@@ -56,8 +57,34 @@ class CanonicalEdge(_Frozen):
     last_seen: float = 0.0
 
 
+class CanonicalRelation(_Frozen):
+    """A directed, verb-labelled edge aggregated from clauses: one per source,
+    target, verb and negation. Negated statements ("löst keine Probleme") form
+    their own edge."""
+
+    source: str                      # node_id of the subject (or a passive's named doer)
+    target: str                      # node_id of the object or predicate noun
+    relation: str                    # the verb, with a separable particle ("einsetzen")
+    negated: bool = False
+    frame: str = "object"            # "object" or "predicate" ("X is Y")
+    weight: int = 0                  # clauses
+    passive: int = 0                 # how many of them were passive
+    cell: str | None = None          # meta-matrix cell: "<source category>-><target category>"
+    by_channel: dict[str, int] = {}
+    first_seen: float = 0.0
+    last_seen: float = 0.0
+
+
 class CanonicalNetwork(_Frozen):
     source_id: str
     nodes: tuple[CanonicalNode, ...] = ()
     edges: tuple[CanonicalEdge, ...] = ()
     n_interactions: int = 0
+    relations: tuple[CanonicalRelation, ...] = ()   # written only when there are any
+
+    @model_serializer(mode="wrap")
+    def _omit_empty_relations(self, handler):
+        data = handler(self)
+        if not self.relations:
+            data.pop("relations", None)
+        return data

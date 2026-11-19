@@ -40,7 +40,8 @@ known limits.
   attribute and time.
 - **Relations.** Spoken clauses become directed edges between names and nouns,
   labelled with the verb ("AfD -[lösen]-> Problem", marked negated for "löst
-  keine Probleme"). The network does not use them yet.
+  keine Probleme"). The network keeps them in their own list, next to
+  co-occurrence.
 - **Network.** Co-occurrence is grounded in the observations (same piece of text,
   pieces of text that overlap in time, same shot), never in a time window, and
   each co-occurrence records whether it comes from speech, on-screen text or
@@ -73,7 +74,7 @@ python run_ner.py             # names
 python run_parse.py           # parse of the text (words, tags, lemmas, links)
 python run_concepts.py        # common nouns
 python run_concept_table.py   # categories for the nouns of all videos
-python run_relations.py       # relations from spoken clauses (not used by the network yet)
+python run_relations.py       # relations from spoken clauses
 python run_network.py         # interaction stream and canonical network
 ```
 

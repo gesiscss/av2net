@@ -1,16 +1,18 @@
 """Layer 3 - Temporal semantic network construction.
 
 For each processed video, reads the Layer 2 semantic events (names from
-semantic_events.jsonl, concepts from semantic_events.concepts.jsonl where
-present), the Layer 1 vision shot intervals and the corpus-level concept
-category table, builds the temporal interaction stream and the canonical
-network, and writes into data/<source_id>/:
+semantic_events.jsonl, concepts from semantic_events.concepts.jsonl and
+relations from semantic_events.relations.jsonl, where present), the Layer 1
+vision shot intervals and the corpus-level concept category table, builds the
+temporal interaction stream and the canonical network, and writes into
+data/<source_id>/:
     temporal_interactions.jsonl    authoritative append-only stream
     canonical_network.json         derived network (rebuildable from the stream)
     run_manifest.network.json      counts, config, versions, timing
 
 Co-occurrence is grounded in observation structure (same text span, overlapping
-spans, same vision shot), never a time window. Concept categories come from one
+spans, same vision shot), never a time window. Relations become directed edges
+labelled with the verb, in their own list of the canonical network. Concept categories come from one
 generated table (run_concept_table.py): by default the table of the configured
 engine (gliner), data/concept_table.<engine>.jsonl; --concept-engine llm takes
 the LLM's table, --concept-table any table file. Concepts missing from the table
@@ -69,6 +71,7 @@ def _process(rd: Path, config: Config, table: dict, table_info: dict) -> None:
 
     n_appears = sum(1 for it in interactions if it.relation == "appears")
     n_cooccur = sum(1 for it in interactions if it.relation == "co_occurs")
+    n_clauses = sum(1 for it in interactions if it.grounding == "clause")
     kind = {n.node_id: n.node_type for n in network.nodes}
     nodes_by_type = Counter(n.node_type for n in network.nodes)
     edges_by_kind = Counter("-".join(sorted((kind[e.source], kind[e.target])))
@@ -77,9 +80,11 @@ def _process(rd: Path, config: Config, table: dict, table_info: dict) -> None:
     concept_categories = Counter(c for n in concepts for c in n.meta_categories)
     not_in_table = sum(1 for n in concepts
                        if (n.node_id.split(":", 2)[-1], n.language) not in table)
-    print(f"  stream: {n_int} interactions ({n_appears} appears, {n_cooccur} co_occurs)")
+    print(f"  stream: {n_int} interactions ({n_appears} appears, {n_cooccur} co_occurs, "
+          f"{n_clauses} clauses)")
     print(f"  network: {len(network.nodes)} nodes {dict(sorted(nodes_by_type.items()))}, "
-          f"{len(network.edges)} edges {dict(sorted(edges_by_kind.items()))}")
+          f"{len(network.edges)} edges {dict(sorted(edges_by_kind.items()))}, "
+          f"{len(network.relations)} relations")
 
     manifest = {
         "layer": 3,
@@ -100,6 +105,10 @@ def _process(rd: Path, config: Config, table: dict, table_info: dict) -> None:
         "n_concept_nodes_not_in_table": not_in_table,
         "n_edges": len(network.edges),
         "n_edges_by_node_types": dict(sorted(edges_by_kind.items())),
+        "n_clause_interactions": n_clauses,
+        "n_relations": len(network.relations),
+        "n_relations_negated": sum(r.negated for r in network.relations),
+        "n_relations_by_cell": dict(sorted(Counter(r.cell for r in network.relations).items())),
         "elapsed_seconds": round(elapsed, 2),
         "config": config.to_dict(),
         "library_versions": {"pydantic": pkg("pydantic")},

@@ -6,6 +6,15 @@ Deterministic. Emits, per configuration:
     co_occurs     same_segment  nodes named in one text span (by any extractor)
                   overlap       nodes from two spans whose intervals overlap
                   same_scene    nodes within one vision shot (a clique)
+    <verb>        clause        one per relation of a relation event: directed
+                                from source to target, the relation field
+                                holding the verb ("lösen"); the clause's frame,
+                                negation, passive, rules and the verb's offsets
+                                ride along in `attributes`
+
+Relation events carry no nodes of their own (their ends are nodes of the same
+span's name and concept events), so they add no appearances or co-occurrences:
+the co-occurrence part of the stream is the same with or without them.
 
 Two node kinds share the network:
 
@@ -207,6 +216,9 @@ def stream_interactions(
     source_id = events[0].source_id if events else "unknown"
     scene_interval = {t0_t1_sid[2]: (t0_t1_sid[0], t0_t1_sid[1]) for t0_t1_sid in scenes.shots}
     concept_categories = concept_categories or {}
+    # Relation events (relations, no nodes) give only the directed edges of part 5 below.
+    relation_events = [e for e in events if e.relations]
+    events = [e for e in events if e.nodes or not e.relations]
 
     # Resolve alias/variant surface forms of names to canonical ids, once, over
     # all events (a global reconciliation step; Layer 3 may look at the whole
@@ -286,6 +298,23 @@ def stream_interactions(
                 emit(t_start=t0, t_end=t1, source_node=a, relation="co_occurs",
                      target_node=b, grounding="same_scene", channels=chans,
                      scene_id=sid, event_refs=refs)
+
+    # 5) clause: directed, verb-labelled relations from relation events. Their
+    #    ends get the ids their nodes have in the name and concept events.
+    if cfg.relations:
+        for e in relation_events:
+            chans = tuple(sorted(_event_channels(e)))
+            sid = scenes.scene_of_interval(e.t_start, e.t_end)
+            for r in e.relations:
+                source = _mention(r.source, e, resolver, concept_categories).node_id
+                target = _mention(r.target, e, resolver, concept_categories).node_id
+                emit(t_start=e.t_start, t_end=e.t_end, source_node=source,
+                     relation=r.relation, target_node=target, grounding="clause",
+                     channels=chans, scene_id=sid, event_refs=(e.event_id,),
+                     observation_refs=e.observation_refs,
+                     attributes={"frame": r.frame, "negated": r.negated,
+                                 "passive": r.passive, "rules": list(r.rules),
+                                 "start": r.start, "end": r.end})
 
     out.sort(key=lambda x: (x.t_start, x.t_end, x.relation, x.source_node,
                             x.target_node or "", x.grounding or ""))

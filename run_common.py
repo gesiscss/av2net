@@ -36,10 +36,10 @@ def write_manifest(path: str | Path, manifest: dict) -> None:
     """Write a step's run manifest, headed by the av2net version that made it."""
     write_json(path, {"av2net_version": AV2NET_VERSION, **manifest})
 
-# Layer 2 event streams of a video, one per extraction step; Layer 3 reads all.
-EVENT_FILES = ("semantic_events.jsonl", "semantic_events.concepts.jsonl")
-# Relation events (run_relations.py); Layer 3 does not read them yet.
+# Relation events (run_relations.py).
 RELATION_EVENTS_FILE = "semantic_events.relations.jsonl"
+# Layer 2 event streams of a video, one per extraction step; Layer 3 reads all.
+EVENT_FILES = ("semantic_events.jsonl", "semantic_events.concepts.jsonl", RELATION_EVENTS_FILE)
 
 # The stored dependency parse (run_parse.py) and its manifest.
 PARSE_FILE = "parse.conllu"

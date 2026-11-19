@@ -319,6 +319,7 @@ class NetworkConfig:
     co_occurrence_same_segment: bool = True  # entities in one observation unit
     co_occurrence_overlap: bool = True       # source segments overlap in time
     co_occurrence_scene: bool = True         # entities within one vision shot (clique)
+    relations: bool = True                   # directed, verb-labelled edges from relation events
     casefold: bool = True                    # identifier normalization: casefold
     emit_appearances: bool = True            # unary "appears" interactions
     # Alias resolution (Layer 3, descriptive): merge surface-form variants of the
