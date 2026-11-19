@@ -211,6 +211,23 @@ class ConceptCategoryConfig:
 
 
 @dataclass(frozen=True)
+class RelationConfig:
+    """The relation extractor: directed edges from clauses, read from the
+    dependency parse. The source is the subject (or the named doer of a
+    passive), the target the direct object or the predicate noun ("X is Y"),
+    and the label the verb (with its separable particle). Both ends must be a
+    name or a concept. One rule adds edges beyond plain clauses; it can be
+    switched off for an ablation."""
+
+    enabled: bool = True
+    channels: tuple[str, ...] = ("speech",)   # add "ocr" for on-screen text
+    relative_pronouns: bool = True    # a relative pronoun stands for the noun its clause modifies
+    # Languages that write particle verbs as one word ("einsetzen"); elsewhere
+    # the label is verb + particle ("send back").
+    particle_prefix_languages: tuple[str, ...] = ("de", "nl", "hu")
+
+
+@dataclass(frozen=True)
 class TextConfig:
     """Layer 2 text assembly: speech + OCR observations -> one text stream.
 
@@ -287,6 +304,7 @@ class ExtractionConfig:
     ner: NERConfig = field(default_factory=NERConfig)
     concepts: ConceptConfig = field(default_factory=ConceptConfig)
     concept_categories: ConceptCategoryConfig = field(default_factory=ConceptCategoryConfig)
+    relations: RelationConfig = field(default_factory=RelationConfig)
 
 
 @dataclass(frozen=True)

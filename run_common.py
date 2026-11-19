@@ -9,8 +9,9 @@ All pipeline artifacts for a video live under one per-video directory:
         parse.conllu                      dependency parse of the text stream
         semantic_events.jsonl             names (NER)
         semantic_events.concepts.jsonl    common nouns
+        semantic_events.relations.jsonl   relations (edges from clauses)
         temporal_interactions.jsonl, canonical_network.json
-        run_manifest.{speech,ocr,vision,text,ner,parse,concepts,network}.json
+        run_manifest.{speech,ocr,vision,text,ner,parse,concepts,relations,network}.json
     data/concept_table.<engine>.jsonl   corpus-level concept categories, per engine
 
 `data/` is regenerable and not tracked. Namespacing by source_id lets several
@@ -37,6 +38,8 @@ def write_manifest(path: str | Path, manifest: dict) -> None:
 
 # Layer 2 event streams of a video, one per extraction step; Layer 3 reads all.
 EVENT_FILES = ("semantic_events.jsonl", "semantic_events.concepts.jsonl")
+# Relation events (run_relations.py); Layer 3 does not read them yet.
+RELATION_EVENTS_FILE = "semantic_events.relations.jsonl"
 
 # The stored dependency parse (run_parse.py) and its manifest.
 PARSE_FILE = "parse.conllu"

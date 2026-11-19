@@ -6,34 +6,40 @@ are the semantic axis: enabling a dimension adds an entry here. Adding a new
 extractor means importing its module and appending it, with no change to the
 pipeline. A run script may ask for some extractors only (`names`), so each
 extraction step can be run and rerun on its own. A run script can also hand in
-the words of a stored parse (`tagger`, e.g. parse.StoredParse); the concept
-extractor then reads those instead of running Stanza.
+the words of a stored parse (`tagger`, e.g. parse.StoredParse); the concept and
+relation extractors then read those instead of running Stanza. The relation
+extractor also needs the names found in each span (`span_names`).
 """
 
 from __future__ import annotations
 
-from typing import Iterable
+from typing import Iterable, Mapping, Sequence
 
 from ..config import ExtractionConfig
+from ..models.event import Node
 from .engines.gliner_engine import GlinerEngine
 from .engines.llm_ollama import OllamaLLM
 from .engines.stanza_engine import StanzaEngine
-from .extractors import concepts, entities
+from .extractors import concepts, entities, relations
 from .extractors.concepts import ConceptExtractor
 from .extractors.entities import GlinerEntityExtractor, LLMEntityExtractor
+from .extractors.relations import RelationExtractor
 from .interfaces import Engine, SemanticExtractor, TokenTaggerEngine
+from .parse import SentenceParser
 
-EXTRACTOR_NAMES = (entities.EXTRACTOR_NAME, concepts.EXTRACTOR_NAME)
+EXTRACTOR_NAMES = (entities.EXTRACTOR_NAME, concepts.EXTRACTOR_NAME, relations.EXTRACTOR_NAME)
 
 
 def build_extractors(
     cfg: ExtractionConfig, names: Iterable[str] | None = None,
     tagger: TokenTaggerEngine | None = None,
+    span_names: Mapping[str, Sequence[Node]] | None = None,
 ) -> tuple[list[SemanticExtractor], dict[str, Engine]]:
     """Return the enabled extractors and the engines they share. `names`
     restricts the result to the named extractors (default: every enabled one).
-    `tagger` replaces the Stanza engine as the concept extractor's source of
-    words (listed as engines["tagger"])."""
+    `tagger` replaces the Stanza engine as the source of words and parses
+    (listed as engines["tagger"]); `span_names` maps a span id to the names
+    found in it, for the relation extractor."""
     wanted = set(EXTRACTOR_NAMES if names is None else names)
     unknown = sorted(wanted - set(EXTRACTOR_NAMES))
     if unknown:
@@ -73,5 +79,13 @@ def build_extractors(
             engines["tagger"] = tagger
         extractors.append(ConceptExtractor(tagger if tagger is not None else stanza_engine(),
                                            cfg.concepts))
+
+    if cfg.relations.enabled and relations.EXTRACTOR_NAME in wanted:
+        if isinstance(tagger, SentenceParser):
+            engines["tagger"] = tagger
+            parser = tagger
+        else:
+            parser = stanza_engine()
+        extractors.append(RelationExtractor(parser, span_names or {}, cfg.relations, cfg.concepts))
 
     return extractors, engines

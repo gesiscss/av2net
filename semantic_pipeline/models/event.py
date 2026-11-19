@@ -63,12 +63,29 @@ class Node(_Frozen):
 
 
 class Relation(_Frozen):
-    """A typed relation between two nodes (by label). Reserved for relation-style
-    extractors; the entity extractor does not emit relations."""
+    """A directed relation between two nodes, found in one clause of the span.
 
-    source: str
+    `source` and `target` are the nodes themselves (a name or a concept, as the
+    entity and concept extractors describe them), so the relation needs no
+    lookup. `relation` is the label: for clauses, the verb's lemma with its
+    separable particle ("einsetzen"), or the copula's ("sein") for "X is Y".
+    `frame` says where the target comes from: "object" (the direct object, or
+    the subject of a passive whose doer is the source) or "predicate" (the noun
+    of "X is Y"). `negated` marks a clause with a negation. `start`/`end` are
+    the character offsets of the verb (or copula) in the span text. `rules`
+    names the rules beyond plain clauses that produced the relation (e.g.
+    "coordination"); empty for a plain clause.
+    """
+
+    source: Node
     relation: str
-    target: str
+    target: Node
+    frame: str = "object"
+    negated: bool = False
+    passive: bool = False
+    start: int | None = None
+    end: int | None = None
+    rules: tuple[str, ...] = ()
 
 
 class SemanticEvent(_Frozen):
