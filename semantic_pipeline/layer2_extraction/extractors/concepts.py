@@ -2,8 +2,9 @@
 
 Reads one text span and emits at most one SemanticEvent carrying its common
 nouns, one node per distinct lemma. A part-of-speech tagger with models for many
-languages (StanzaEngine) finds the nouns: words tagged NOUN in the Universal
-Dependencies tag set, which is the same in every language. Proper nouns (PROPN)
+languages finds the nouns: the stored parse written by run_parse.py
+(parse.StoredParse), or Stanza directly (StanzaEngine). Nouns are words tagged
+NOUN in the Universal Dependencies tag set, which is the same in every language. Proper nouns (PROPN)
 are left to the entity extractor. There is no salience judgment: salience can be
 read from frequency and network position.
 

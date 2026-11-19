@@ -1,28 +1,59 @@
-"""Stanza engine: tokenizer, part-of-speech tagger and lemmatizer per language.
+"""Stanza engine: tokenizer, part-of-speech tagger, lemmatizer and dependency
+parser per language.
 
 Stanza (Apache-2.0) has models for over 100 languages, trained on Universal
 Dependencies treebanks, so every language gets the same tag set (NOUN, PROPN,
-VERB, ...). One pipeline is built per language, on first use, from the ISO code
-a text span records. The installed Stanza version fixes the model files (its
-resources version), and the models run on CPU without sampling, so the same
-text always gives the same tags and lemmas.
+VERB, ...) and the same dependency relations (nsubj, obj, amod, ...). One
+pipeline is built per language, on first use, from the ISO code a text span
+records. The installed Stanza version fixes the model files (its resources
+version), and the models run on CPU without sampling, so the same text always
+gives the same tags, lemmas and dependencies.
 
 Language codes are matched to Stanza's in two steps: the code itself, then its
 part before a hyphen ("zh-cn" -> "zh"), following Stanza's own aliases
 ("zh" -> "zh-hans", "no" -> "nb"). A language counts as supported only if
-Stanza has both a tagger and a lemmatizer for it.
+Stanza has both a tagger and a lemmatizer for it; the dependency parser is used
+where the language has one.
+
+`parse` reads many texts of one language in one batch and is what run_parse.py
+uses; `tag_tokens` tags a single text.
 """
 
 from __future__ import annotations
 
 import warnings
 from importlib.metadata import PackageNotFoundError, version
-from typing import Any
+from typing import Any, Sequence
 
 from ...config import StanzaConfig
 from ..interfaces import Token, TokenTaggerEngine
+from ..parse import MultiWordToken, ParsedSentence, ParsedWord
 
 _REQUIRED = ("tokenize", "pos", "lemma")
+
+
+def convert_document(doc: Any) -> tuple[ParsedSentence, ...]:
+    """A Stanza document as parsed sentences. Words inside a multi-word token
+    take the token's character offsets."""
+    sentences = []
+    for sent in doc.sentences:
+        words, multiword = [], []
+        for token in sent.tokens:
+            ids = token.id if isinstance(token.id, tuple) else (token.id,)
+            if len(token.words) > 1:
+                multiword.append(MultiWordToken(int(ids[0]), int(ids[-1]), token.text,
+                                                int(token.start_char), int(token.end_char)))
+            for word in token.words:
+                start = word.start_char if word.start_char is not None else token.start_char
+                end = word.end_char if word.end_char is not None else token.end_char
+                words.append(ParsedWord(
+                    id=int(word.id), text=word.text, lemma=word.lemma, upos=word.upos or "",
+                    xpos=word.xpos, feats=word.feats,
+                    head=None if word.head is None else int(word.head), deprel=word.deprel,
+                    start=int(start), end=int(end)))
+        sentences.append(ParsedSentence(text=sent.text, words=tuple(words),
+                                        multiword=tuple(multiword)))
+    return tuple(sentences)
 
 
 class StanzaEngine(TokenTaggerEngine):
@@ -121,6 +152,23 @@ class StanzaEngine(TokenTaggerEngine):
                     **kwargs,
                 )
         return self._pipelines[code]
+
+    def parse(self, texts: Sequence[str], language: str | None) -> list[tuple[ParsedSentence, ...]] | None:
+        """Parse several texts of one language in one batch: the sentences of
+        each text, in input order (none for an empty text). None if `language`
+        has no model."""
+        code = self.resolve(language)
+        if code is None:
+            return None
+        out: list[tuple[ParsedSentence, ...]] = [() for _ in texts]
+        todo = [i for i, text in enumerate(texts) if text.strip()]
+        if todo:
+            import stanza
+
+            docs = self._pipeline(code)([stanza.Document([], text=texts[i]) for i in todo])
+            for i, doc in zip(todo, docs):
+                out[i] = convert_document(doc)
+        return out
 
     def tag_tokens(self, text: str, language: str | None) -> list[Token] | None:
         code = self.resolve(language)

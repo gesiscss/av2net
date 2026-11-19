@@ -134,16 +134,18 @@ class NERConfig:
 
 @dataclass(frozen=True)
 class StanzaConfig:
-    """A Stanza pipeline: tokenizer, part-of-speech tagger and lemmatizer.
+    """A Stanza pipeline: tokenizer, part-of-speech tagger, lemmatizer and
+    dependency parser.
 
     Stanza has models for over 100 languages, all tagged with the Universal
-    Dependencies part-of-speech set, so the same code serves every language. One
-    pipeline is built per language, on first use, from the language each text
-    span records. The installed Stanza version fixes the model files (its
-    resources version), so pinning the package pins the models.
+    Dependencies part-of-speech set and relations, so the same code serves every
+    language. One pipeline is built per language, on first use, from the
+    language each text span records. The installed Stanza version fixes the
+    model files (its resources version), so pinning the package pins the models.
     """
 
-    processors: tuple[str, ...] = ("tokenize", "mwt", "pos", "lemma")  # mwt only where it exists
+    # mwt and depparse only where a language has them
+    processors: tuple[str, ...] = ("tokenize", "mwt", "pos", "lemma", "depparse")
     package: str = "default"        # Stanza's default model package per language
     device: str = "cpu"
     model_dir: str | None = None    # None = Stanza's default model cache

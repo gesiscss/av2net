@@ -18,7 +18,7 @@ known limits.
 | Layer | Turns | into | Scripts |
 |---|---|---|---|
 | 1 Observation | the video (MP4) | sentences, on-screen text blocks, shots | [run_speech.py](run_speech.py), [run_ocr.py](run_ocr.py), [run_vision.py](run_vision.py) |
-| 2 Semantic extraction | observations | one text stream per video, then names, common nouns and their categories | [run_text.py](run_text.py), [run_ner.py](run_ner.py), [run_concepts.py](run_concepts.py), [run_concept_table.py](run_concept_table.py) |
+| 2 Semantic extraction | observations | one text stream per video and its parse, then names, common nouns and their categories | [run_text.py](run_text.py), [run_ner.py](run_ner.py), [run_parse.py](run_parse.py), [run_concepts.py](run_concepts.py), [run_concept_table.py](run_concept_table.py) |
 | 3 Network construction | semantic events | a temporal interaction stream and a canonical network | [run_network.py](run_network.py) |
 
 - **Observation.** Speech recognition with faster-whisper, on-screen text with
@@ -31,7 +31,8 @@ known limits.
   audit.
 - **Names and nouns.** Names come from GLiNER (or an instruction-tuned LLM on
   Ollama), typed as Person, Group, Organization, Place, Event, Work, Product or
-  Other. Common nouns come from Stanza, by lemma, in over 100 languages. A
+  Other. Stanza parses the text once per video, in over 100 languages, and the
+  parse is stored as CoNLL-U; common nouns are taken from it by lemma. A
   generated table gives the nouns categories from the same set as the names:
   agent, role, organization, location, event, task, resource, knowledge,
   attribute and time.
@@ -64,6 +65,7 @@ python run_ocr.py             # on-screen text
 python run_vision.py          # shots and picture descriptions (optional, needs Ollama)
 python run_text.py            # one text stream per video
 python run_ner.py             # names
+python run_parse.py           # parse of the text (words, tags, lemmas, links)
 python run_concepts.py        # common nouns
 python run_concept_table.py   # categories for the nouns of all videos
 python run_network.py         # interaction stream and canonical network

@@ -5,7 +5,9 @@ extractor that needs it (so a model is loaded once, not per extractor). Extracto
 are the semantic axis: enabling a dimension adds an entry here. Adding a new
 extractor means importing its module and appending it, with no change to the
 pipeline. A run script may ask for some extractors only (`names`), so each
-extraction step can be run and rerun on its own.
+extraction step can be run and rerun on its own. A run script can also hand in
+the words of a stored parse (`tagger`, e.g. parse.StoredParse); the concept
+extractor then reads those instead of running Stanza.
 """
 
 from __future__ import annotations
@@ -19,16 +21,19 @@ from .engines.stanza_engine import StanzaEngine
 from .extractors import concepts, entities
 from .extractors.concepts import ConceptExtractor
 from .extractors.entities import GlinerEntityExtractor, LLMEntityExtractor
-from .interfaces import Engine, SemanticExtractor
+from .interfaces import Engine, SemanticExtractor, TokenTaggerEngine
 
 EXTRACTOR_NAMES = (entities.EXTRACTOR_NAME, concepts.EXTRACTOR_NAME)
 
 
 def build_extractors(
-    cfg: ExtractionConfig, names: Iterable[str] | None = None
+    cfg: ExtractionConfig, names: Iterable[str] | None = None,
+    tagger: TokenTaggerEngine | None = None,
 ) -> tuple[list[SemanticExtractor], dict[str, Engine]]:
     """Return the enabled extractors and the engines they share. `names`
-    restricts the result to the named extractors (default: every enabled one)."""
+    restricts the result to the named extractors (default: every enabled one).
+    `tagger` replaces the Stanza engine as the concept extractor's source of
+    words (listed as engines["tagger"])."""
     wanted = set(EXTRACTOR_NAMES if names is None else names)
     unknown = sorted(wanted - set(EXTRACTOR_NAMES))
     if unknown:
@@ -64,6 +69,9 @@ def build_extractors(
             raise ValueError(f"Unknown engine for NER: {cfg.ner.engine!r} (use 'gliner' or 'llm')")
 
     if cfg.concepts.enabled and concepts.EXTRACTOR_NAME in wanted:
-        extractors.append(ConceptExtractor(stanza_engine(), cfg.concepts))
+        if tagger is not None:
+            engines["tagger"] = tagger
+        extractors.append(ConceptExtractor(tagger if tagger is not None else stanza_engine(),
+                                           cfg.concepts))
 
     return extractors, engines

@@ -1,4 +1,4 @@
-"""Layer 2, step 3 - Generated category table for concepts.
+"""Layer 2, step 4 - Generated category table for concepts.
 
 Collects every (lemma, language) in the videos' concept events
 (semantic_events.concepts.jsonl, see run_concepts.py) that are not in the
@@ -10,8 +10,9 @@ per engine:
 
 --engine chooses who fills the table, as for NER:
     gliner  (default) GLiNER labels each noun occurrence in its text span, and
-            each lemma takes the category with the most votes. Runs on CPU in
-            minutes.
+            each lemma takes the category with the most votes. The nouns and
+            their positions come from each video's parse.conllu (run_parse.py).
+            Runs on CPU in minutes.
     llm     an instruction-tuned model on a local Ollama server (default
             qwen2.5:3b; --model qwen2.5:14b for the larger, much slower model;
             the model must be pulled). It reads the category definitions and one
@@ -47,7 +48,7 @@ from datetime import date
 from pathlib import Path
 from typing import Iterator
 
-from run_common import DEFAULT_DATA_DIR, pkg, run_dir
+from run_common import DEFAULT_DATA_DIR, PARSE_FILE, parse_problem, pkg, run_dir
 from run_concepts import EVENTS_FILE
 from semantic_pipeline.concept_table import (
     ConceptRow,
@@ -71,7 +72,7 @@ from semantic_pipeline.layer2_extraction.categorize import (
 from semantic_pipeline.layer2_extraction.context import TextSpan
 from semantic_pipeline.layer2_extraction.engines.gliner_engine import GlinerEngine
 from semantic_pipeline.layer2_extraction.engines.llm_ollama import OllamaLLM
-from semantic_pipeline.layer2_extraction.engines.stanza_engine import StanzaEngine
+from semantic_pipeline.layer2_extraction.parse import StoredParse
 from semantic_pipeline.layer3_network.stream import span_key
 from semantic_pipeline.models.event import SemanticEvent
 
@@ -99,7 +100,12 @@ def _manifest_path(table_path: Path) -> Path:
 
 
 def _fill_gliner(ext, cat_cfg, table_path, dirs, wanted, needed, created) -> dict:
-    tagger = StanzaEngine(ext.stanza)
+    used = [rd for rd in dirs if needed.get(rd)]
+    problems = {rd.name: p for rd in used if (p := parse_problem(rd))}
+    if problems:
+        raise SystemExit("The GLiNER filler reads each video's parse. Fix these first:\n"
+                         + "\n".join(f"  {name}: {p}" for name, p in sorted(problems.items())))
+    tagger = StoredParse.from_files(rd / PARSE_FILE for rd in used)
     gliner = GlinerEngine(replace(ext.gliner, threshold=cat_cfg.threshold))
     categorizer = GlinerConceptCategorizer(gliner, cat_cfg)
     _check_filler(table_path, categorizer)
@@ -111,7 +117,8 @@ def _fill_gliner(ext, cat_cfg, table_path, dirs, wanted, needed, created) -> dic
     append_rows(table_path, rows)
     return {"rows": rows, "model": categorizer.model_id,
             "config_version": categorizer.config_version,
-            "extra": {"tagger": tagger.model_id, "stanza_models": tagger.language_models(),
+            "extra": {"tagger": tagger.model_id, "parse": PARSE_FILE,
+                      "n_spans_missing_from_parse": tagger.misses,
                       "n_votes": sum(sum(r.votes.values()) for r in rows)}}
 
 
@@ -196,7 +203,7 @@ def _compare(args, ap) -> None:
 
 
 def main() -> None:
-    ap = argparse.ArgumentParser(description="Layer 2 step 3: generated category table for concepts")
+    ap = argparse.ArgumentParser(description="Layer 2 step 4: generated category table for concepts")
     ap.add_argument("--datadir", default=DEFAULT_DATA_DIR, help="per-video data root")
     ap.add_argument("--engine", choices=("gliner", "llm"), default=None,
                     help="who fills the table (default: gliner)")
