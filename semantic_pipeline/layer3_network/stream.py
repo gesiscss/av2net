@@ -16,7 +16,10 @@ Two node kinds share the network:
               id "concept:<language>:<normalized lemma>". They never merge with
               a name, even one spelled the same way, and never fuzzy-merge.
               Their categories come from the generated category table
-              (concept_table.py) and ride along in the `appears` attributes.
+              (concept_table.py) and ride along in the `appears` attributes. A
+              term of several words takes its own row where the table assigns
+              one, otherwise its head noun's (marked in the attributes); its
+              head and the adjectives seen with a concept ride along too.
 
 Several extractors reading one text span emit one event each; they are grouped
 by span (the event's `span_id`, or for older events the event id without its
@@ -39,7 +42,7 @@ from ..concept_table import CategoryLookup, concept_key
 from ..config import NetworkConfig
 from ..models.event import Node, SemanticEvent
 from ..models.interaction import TemporalInteraction
-from ..ontology import CONCEPT, ENTITY
+from ..ontology import CONCEPT, ENTITY, UNASSIGNED
 from .resolve import EntityResolver, build_resolver
 from .scenes import SceneIndex
 
@@ -53,6 +56,9 @@ class _Mention:
     lemma: str | None = None
     language: str | None = None
     meta_categories: tuple[str, ...] | None = None  # concepts in the table only
+    head: str | None = None                         # terms: the head noun's lemma
+    adjectives: tuple[str, ...] = ()
+    categories_from_head: bool = False              # a term took its head's categories
 
     def attributes(self) -> dict:
         attrs = {"label": self.label, "category": self.category}
@@ -63,6 +69,12 @@ class _Mention:
             attrs["language"] = self.language
         if self.meta_categories is not None:
             attrs["meta_categories"] = list(self.meta_categories)
+        if self.categories_from_head:
+            attrs["meta_categories_from"] = "head"
+        if self.head is not None:
+            attrs["head"] = self.head
+        if self.adjectives:
+            attrs["adjectives"] = list(self.adjectives)
         return attrs
 
 
@@ -128,10 +140,17 @@ def _mention(node: Node, event: SemanticEvent, resolver: EntityResolver,
     if node.node_type == CONCEPT:
         lemma = node.lemma or node.label
         language = event.language or "und"
+        categories = concept_categories.get((concept_key(lemma), language))
+        from_head = False
+        if node.head and (categories is None or tuple(categories) == (UNASSIGNED,)):
+            head_categories = concept_categories.get((concept_key(node.head), language))
+            if head_categories is not None and tuple(head_categories) != (UNASSIGNED,):
+                categories, from_head = head_categories, True
         return _Mention(
             node_id=concept_node_id(lemma, language), label=node.label,
             category=node.category, node_type=CONCEPT, lemma=lemma, language=language,
-            meta_categories=concept_categories.get((concept_key(lemma), language)),
+            meta_categories=categories, head=node.head, adjectives=tuple(node.adjectives),
+            categories_from_head=from_head,
         )
     return _Mention(resolver.entity_id(node.label), node.label, node.category)
 

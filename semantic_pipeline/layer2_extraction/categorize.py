@@ -3,10 +3,10 @@
 GLiNER (default)
     GLiNER reads each text span with short category labels ("people", "job or
     role", "place", ...) and returns labelled stretches of text. A label counts
-    as a vote for a noun when the labelled stretch contains exactly that one
-    noun; a stretch with several nouns ("ministry of health") gives no
-    vote, since which noun the label belongs to would need language-specific
-    rules. Each lemma gets the category with the most votes over all its
+    as a vote for a concept (a noun, or a term of several words) when the
+    labelled stretch contains exactly that one concept; a stretch with several
+    ("ministry of health") gives no vote, since which concept the label belongs
+    to would need language-specific rules. Each lemma gets the category with the most votes over all its
     occurrences, or two when the top two tie. A lemma without a vote is
     unassigned. The nouns and their positions come from the same tagger as the
     concept extractor, so the table covers exactly the lemmas in the concept
@@ -34,11 +34,12 @@ from dataclasses import dataclass, field
 from typing import Any, Iterable, Sequence
 
 from ..concept_table import ConceptRow, concept_key
-from ..config import ConceptCategoryConfig
+from ..config import ConceptCategoryConfig, ConceptConfig
 from ..ontology import AGENT_ROLE_RULE, CATEGORIES, CATEGORY_EXAMPLES, UNASSIGNED
 from .context import TextSpan
-from .extractors.concepts import concept_tokens
+from .extractors.concepts import concept_tokens, concept_units
 from .interfaces import LLMEngine, SpanTaggerEngine, Token, TokenTaggerEngine
+from .parse import SentenceParser
 
 # Bump when a decision rule below changes, so the table's config_version changes.
 _GLINER_RULE = "single-noun-span/majority/v1"
@@ -110,24 +111,37 @@ def decide(votes: Counter, scores: dict[str, float], max_categories: int) -> tup
     return tuple(c for c in ranked if votes[c] == top)[:max(1, max_categories)]
 
 
+def concept_occurrences(span: TextSpan, tagger: TokenTaggerEngine,
+                        concepts: ConceptConfig) -> list[tuple[Token, str]]:
+    """The concepts of a span with their lemmas, as the concept extractor forms
+    them: with a parse, terms count as one occurrence spanning their words."""
+    if isinstance(tagger, SentenceParser):
+        sentences = tagger.sentences(span.text, span.language)
+        if not sentences:
+            return []
+        return [(u.token, u.token.lemma)
+                for u in concept_units(span.text, sentences, concepts, span.language)]
+    tokens = tagger.tag_tokens(span.text, span.language)
+    return concept_tokens(tokens, concepts.upos) if tokens else []
+
+
 def tally_votes(
     spans: Iterable[TextSpan],
     tagger: TokenTaggerEngine,
     categorizer: GlinerConceptCategorizer,
-    upos: tuple[str, ...],
+    concepts: ConceptConfig,
     wanted: set[tuple[str, str]],
 ) -> dict[tuple[str, str], Tally]:
     """Votes for the wanted (key, language) pairs over the given spans. GLiNER
-    runs only on spans that contain a wanted noun; every noun of the span still
-    counts when deciding whether a labelled stretch holds a single noun."""
+    runs only on spans that contain a wanted concept; every concept of the span
+    still counts when deciding whether a labelled stretch holds a single one."""
     tallies: dict[tuple[str, str], Tally] = defaultdict(Tally)
     for span in spans:
         if not span.language:
             continue
-        tokens = tagger.tag_tokens(span.text, span.language)
-        if not tokens:
+        nouns = concept_occurrences(span, tagger, concepts)
+        if not nouns:
             continue
-        nouns = concept_tokens(tokens, upos)
         hits = [(t, lemma) for t, lemma in nouns if (concept_key(lemma), span.language) in wanted]
         if not hits:
             continue

@@ -17,6 +17,6 @@ deterministic transformation of its inputs (functional core); model calls and
 file I/O live in the imperative shell.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = ["config", "io", "models"]

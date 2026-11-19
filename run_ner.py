@@ -31,9 +31,9 @@ from collections import Counter
 from dataclasses import replace
 from pathlib import Path
 
-from run_common import DEFAULT_DATA_DIR, discover_run_dirs, pkg, run_dir
+from run_common import DEFAULT_DATA_DIR, discover_run_dirs, pkg, run_dir, write_manifest
 from semantic_pipeline.config import Config
-from semantic_pipeline.io import read_jsonl, write_json, write_jsonl
+from semantic_pipeline.io import read_jsonl, write_jsonl
 from semantic_pipeline.layer2_extraction.context import TextSpan
 from semantic_pipeline.layer2_extraction.extractors.entities import EXTRACTOR_NAME
 from semantic_pipeline.layer2_extraction.factory import build_extractors
@@ -85,7 +85,7 @@ def _process(rd: Path, config: Config, extractors) -> None:
             "pydantic": pkg("pydantic"),
         },
     }
-    write_json(rd / "run_manifest.ner.json", manifest)
+    write_manifest(rd / "run_manifest.ner.json", manifest)
 
     print(f"Done: {n} events, {n_entities} entity mentions in {elapsed:.1f}s "
           f"-> {rd / 'semantic_events.jsonl'}")

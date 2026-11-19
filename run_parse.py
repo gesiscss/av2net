@@ -27,9 +27,17 @@ import time
 from collections import Counter, defaultdict
 from pathlib import Path
 
-from run_common import DEFAULT_DATA_DIR, PARSE_FILE, PARSE_MANIFEST, discover_run_dirs, pkg, run_dir
+from run_common import (
+    DEFAULT_DATA_DIR,
+    PARSE_FILE,
+    PARSE_MANIFEST,
+    discover_run_dirs,
+    pkg,
+    run_dir,
+    write_manifest,
+)
 from semantic_pipeline.config import Config
-from semantic_pipeline.io import read_jsonl, write_json
+from semantic_pipeline.io import read_jsonl
 from semantic_pipeline.layer2_extraction.context import TextSpan
 from semantic_pipeline.layer2_extraction.engines.stanza_engine import StanzaEngine
 from semantic_pipeline.layer2_extraction.parse import ParsedSpan, file_sha1, text_sha1, write_conllu
@@ -98,7 +106,7 @@ def _process(rd: Path, config: Config, engine: StanzaEngine) -> None:
             "pydantic": pkg("pydantic"),
         },
     }
-    write_json(rd / PARSE_MANIFEST, manifest)
+    write_manifest(rd / PARSE_MANIFEST, manifest)
 
     print(f"Done: {n} spans, {n_sentences} sentences, {n_words} words in {elapsed:.1f}s "
           f"-> {rd / PARSE_FILE}")

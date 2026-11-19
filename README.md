@@ -32,7 +32,9 @@ known limits.
 - **Names and nouns.** Names come from GLiNER (or an instruction-tuned LLM on
   Ollama), typed as Person, Group, Organization, Place, Event, Work, Product or
   Other. Stanza parses the text once per video, in over 100 languages, and the
-  parse is stored as CoNLL-U; common nouns are taken from it by lemma. A
+  parse is stored as CoNLL-U; common nouns are taken from it by lemma, nouns
+  that form a term with other words ("climate change") become one node, and
+  adjectives are recorded on their nouns. A
   generated table gives the nouns categories from the same set as the names:
   agent, role, organization, location, event, task, resource, knowledge,
   attribute and time.

@@ -32,6 +32,9 @@ def to_networkx(network: CanonicalNetwork) -> Any:
             mention_count=node.mention_count,
             first_seen=node.first_seen,
             last_seen=node.last_seen,
+            head=node.head,
+            adjectives=dict(node.adjectives),
+            meta_categories_from=node.meta_categories_from,
         )
     for edge in network.edges:
         g.add_edge(

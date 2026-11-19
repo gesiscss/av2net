@@ -22,9 +22,9 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
-from run_common import DEFAULT_DATA_DIR, pkg, run_dir, select_videos, source_id_of
+from run_common import DEFAULT_DATA_DIR, pkg, run_dir, select_videos, source_id_of, write_manifest
 from semantic_pipeline.config import Config
-from semantic_pipeline.io import write_json, write_jsonl
+from semantic_pipeline.io import write_jsonl
 from semantic_pipeline.layer1_observation.factory import build_vision
 from semantic_pipeline.layer1_observation.frames import FrameSampler
 from semantic_pipeline.layer1_observation.vision_stream import detect_shots, stream_vision
@@ -92,7 +92,7 @@ def _process(video: str, config: Config, datadir: str, cli_caption_lang: str | N
             "pydantic": pkg("pydantic"),
         },
     }
-    write_json(rd / "run_manifest.vision.json", manifest)
+    write_manifest(rd / "run_manifest.vision.json", manifest)
 
     print(f"Done: {n} vision units from {len(shots)} shots in {elapsed:.1f}s "
           f"-> {rd / 'observations.vision.jsonl'}")

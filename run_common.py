@@ -25,7 +25,15 @@ import json
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
+from semantic_pipeline import __version__ as AV2NET_VERSION
+from semantic_pipeline.io import write_json
+
 DEFAULT_DATA_DIR = "data"
+
+
+def write_manifest(path: str | Path, manifest: dict) -> None:
+    """Write a step's run manifest, headed by the av2net version that made it."""
+    write_json(path, {"av2net_version": AV2NET_VERSION, **manifest})
 
 # Layer 2 event streams of a video, one per extraction step; Layer 3 reads all.
 EVENT_FILES = ("semantic_events.jsonl", "semantic_events.concepts.jsonl")

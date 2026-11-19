@@ -48,7 +48,7 @@ from datetime import date
 from pathlib import Path
 from typing import Iterator
 
-from run_common import DEFAULT_DATA_DIR, PARSE_FILE, parse_problem, pkg, run_dir
+from run_common import DEFAULT_DATA_DIR, PARSE_FILE, parse_problem, pkg, run_dir, write_manifest
 from run_concepts import EVENTS_FILE
 from semantic_pipeline.concept_table import (
     ConceptRow,
@@ -112,7 +112,7 @@ def _fill_gliner(ext, cat_cfg, table_path, dirs, wanted, needed, created) -> dic
     print(f"Labelling noun occurrences with {categorizer.model_id} "
           f"(config {categorizer.config_version}) ...")
     tallies = tally_votes(_spans(dirs, needed), tagger, categorizer,
-                          ext.concepts.upos, set(wanted))
+                          ext.concepts, set(wanted))
     rows = rows_from_tallies(wanted, tallies, categorizer, cat_cfg.max_categories, created)
     append_rows(table_path, rows)
     return {"rows": rows, "model": categorizer.model_id,
@@ -305,7 +305,7 @@ def main() -> None:
             "transformers": pkg("transformers"),
         },
     }
-    write_json(_manifest_path(table_path), manifest)
+    write_manifest(_manifest_path(table_path), manifest)
     failed = result["extra"].get("n_without_answer", 0)
     print(f"Done: {len(rows)} rows added ({dict(sorted(by_category.items()))}, {n_two} with two "
           f"categories) in {elapsed:.1f}s -> {table_path}"

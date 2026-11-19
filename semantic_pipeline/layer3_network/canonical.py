@@ -7,7 +7,9 @@ from the (authoritative) interaction stream with no video and no re-extraction:
             frequent surface), dominant name type + type distribution, the
             type's shared category (ontology mapping, see ontology.py).
             Concepts: the lemma as label, its language, and the categories the
-            generated table gave it (unassigned if the table has no row).
+            generated table gave it (unassigned if the table has no row); for
+            a term its head noun (and whether its categories are the head's),
+            and the adjectives seen with the concept, with their counts.
             Both: mention count, first/last seen.
     edges   aggregated co-occurrence: total weight, per-grounding breakdown,
             first/last seen
@@ -31,6 +33,9 @@ def build_canonical(source_id: str, interactions: list[TemporalInteraction]) -> 
     lemmas: dict[str, Counter] = defaultdict(Counter)
     languages: dict[str, Counter] = defaultdict(Counter)
     meta_sets: dict[str, Counter] = defaultdict(Counter)
+    meta_from: dict[str, Counter] = defaultdict(Counter)
+    heads: dict[str, Counter] = defaultdict(Counter)
+    adjectives: dict[str, Counter] = defaultdict(Counter)
     mention_count: Counter = Counter()
     first_seen: dict[str, float] = {}
     last_seen: dict[str, float] = {}
@@ -64,6 +69,10 @@ def build_canonical(source_id: str, interactions: list[TemporalInteraction]) -> 
                 languages[n][a["language"]] += 1
             if a.get("meta_categories"):
                 meta_sets[n][tuple(a["meta_categories"])] += 1
+                meta_from[n][(tuple(a["meta_categories"]), a.get("meta_categories_from"))] += 1
+            if a.get("head"):
+                heads[n][a["head"]] += 1
+            adjectives[n].update(a.get("adjectives", ()))
         elif it.relation == "co_occurs" and it.target_node is not None:
             key = (it.source_node, it.target_node)  # already sorted in the stream
             touch(it.source_node, it.t_start, it.t_end)
@@ -82,10 +91,13 @@ def build_canonical(source_id: str, interactions: list[TemporalInteraction]) -> 
     def node(n: str) -> CanonicalNode:
         node_type = best(node_types[n], default=ENTITY)
         dominant = best(categories[n])
+        metas_from = None
         if node_type == CONCEPT:
             metas = best(meta_sets[n], default=(UNASSIGNED,))
             label = best(lemmas[n], default=best(labels[n], default=n))
             language = best(languages[n])
+            from_head = meta_from[n].get((tuple(metas), "head"), 0)
+            metas_from = "head" if from_head > meta_from[n].get((tuple(metas), None), 0) else None
         else:
             metas = (category_of(dominant),)
             label = best(labels[n], default=n)
@@ -102,6 +114,9 @@ def build_canonical(source_id: str, interactions: list[TemporalInteraction]) -> 
             mention_count=int(mention_count[n]),
             first_seen=first_seen.get(n, 0.0),
             last_seen=last_seen.get(n, 0.0),
+            head=best(heads[n]),
+            adjectives=dict(sorted(adjectives[n].items(), key=lambda kv: (-kv[1], kv[0]))),
+            meta_categories_from=metas_from,
         )
 
     nodes = tuple(node(n) for n in sorted(node_ids))

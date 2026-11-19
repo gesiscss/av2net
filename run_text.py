@@ -28,9 +28,9 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
-from run_common import DEFAULT_DATA_DIR, discover_run_dirs, pkg, run_dir
+from run_common import DEFAULT_DATA_DIR, discover_run_dirs, pkg, run_dir, write_manifest
 from semantic_pipeline.config import Config
-from semantic_pipeline.io import read_jsonl, write_json, write_jsonl
+from semantic_pipeline.io import read_jsonl, write_jsonl
 from semantic_pipeline.layer2_extraction.context import assemble
 from semantic_pipeline.layer2_extraction.interfaces import TruecaseEngine
 from semantic_pipeline.models.observation import OCRObservation, SpeechObservation
@@ -73,7 +73,7 @@ def _process(rd: Path, config: Config, truecaser: TruecaseEngine | None) -> None
         "config": config.to_dict(),
         "library_versions": versions,
     }
-    write_json(rd / "run_manifest.text.json", manifest)
+    write_manifest(rd / "run_manifest.text.json", manifest)
 
     rows = ", ".join(f"y={t['y_top']:.2f}-{t['y_bottom']:.2f}" for t in d["subtitle_tracks"])
     where = f"{rows}; renders {d['speech_covered_by_subtitles']:.0%} of speech" if rows else "none"

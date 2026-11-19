@@ -35,6 +35,7 @@ stream recorded in the parse step's run manifest.
 from __future__ import annotations
 
 import hashlib
+from abc import abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable, Iterator
@@ -239,9 +240,22 @@ def read_conllu(path: str | Path) -> Iterator[ParsedSpan]:
         yield from parse_conllu(f)
 
 
-# --- the stored parse as a tagger ---------------------------------------------------
+# --- parsers ------------------------------------------------------------------------
 
-class StoredParse(TokenTaggerEngine):
+class SentenceParser(TokenTaggerEngine):
+    """A tagger that also gives the dependency parse of a text. Its tokens are
+    the words of the parsed sentences."""
+
+    @abstractmethod
+    def sentences(self, text: str, language: str | None) -> tuple[ParsedSentence, ...] | None:
+        """The parsed sentences of `text`; None if `language` has no model."""
+
+    def tag_tokens(self, text: str, language: str | None) -> list[Token] | None:
+        sentences = self.sentences(text, language)
+        return None if sentences is None else tokens_of(sentences)
+
+
+class StoredParse(SentenceParser):
     """Parsed spans served like a tagger. A span is looked up by its language and
     text, so the concept extractor and the category table's GLiNER filler read
     the stored words instead of running the tagger. A language counts as
@@ -288,7 +302,3 @@ class StoredParse(TokenTaggerEngine):
             self.misses += 1
             return ()
         return span.sentences
-
-    def tag_tokens(self, text: str, language: str | None) -> list[Token] | None:
-        sentences = self.sentences(text, language)
-        return None if sentences is None else tokens_of(sentences)

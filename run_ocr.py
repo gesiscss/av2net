@@ -18,9 +18,9 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
-from run_common import DEFAULT_DATA_DIR, pkg, run_dir, select_videos, source_id_of
+from run_common import DEFAULT_DATA_DIR, pkg, run_dir, select_videos, source_id_of, write_manifest
 from semantic_pipeline.config import Config
-from semantic_pipeline.io import write_json, write_jsonl
+from semantic_pipeline.io import write_jsonl
 from semantic_pipeline.layer1_observation.ocr_stream import detect_and_build_ocr, stream_ocr
 
 
@@ -61,7 +61,7 @@ def _process(video: str, config: Config, datadir: str) -> None:
             "pydantic": pkg("pydantic"),
         },
     }
-    write_json(rd / "run_manifest.ocr.json", manifest)
+    write_manifest(rd / "run_manifest.ocr.json", manifest)
 
     print(f"Done: {n} OCR units in {elapsed:.1f}s -> {rd / 'observations.ocr.jsonl'}")
 

@@ -19,7 +19,7 @@ recoverable without a dedicated field.
 
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_serializer
 
 
 class _Frozen(BaseModel):
@@ -38,6 +38,10 @@ class Node(_Frozen):
     (concepts only); Layer 3 merges concepts by lemma. `confidence` is the
     model's score for this node, if the model gives one (GLiNER does, the LLM
     and the tagger do not).
+
+    Concepts only: `head` is the head noun's lemma when the node is a term of
+    several words ("Krieg" for "Iran-Krieg"); `adjectives` are the lemmas of the
+    adjectives that modify the noun in the span. Both are written only when set.
     """
 
     label: str
@@ -45,6 +49,17 @@ class Node(_Frozen):
     category: str | None = None
     lemma: str | None = None
     confidence: float | None = None
+    head: str | None = None
+    adjectives: tuple[str, ...] = ()
+
+    @model_serializer(mode="wrap")
+    def _omit_unset_concept_fields(self, handler):
+        data = handler(self)
+        if self.head is None:
+            data.pop("head", None)
+        if not self.adjectives:
+            data.pop("adjectives", None)
+        return data
 
 
 class Relation(_Frozen):

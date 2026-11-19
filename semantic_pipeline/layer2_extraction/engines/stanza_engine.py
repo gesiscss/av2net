@@ -26,8 +26,8 @@ from importlib.metadata import PackageNotFoundError, version
 from typing import Any, Sequence
 
 from ...config import StanzaConfig
-from ..interfaces import Token, TokenTaggerEngine
-from ..parse import MultiWordToken, ParsedSentence, ParsedWord
+from ..interfaces import Token
+from ..parse import MultiWordToken, ParsedSentence, ParsedWord, SentenceParser
 
 _REQUIRED = ("tokenize", "pos", "lemma")
 
@@ -56,7 +56,7 @@ def convert_document(doc: Any) -> tuple[ParsedSentence, ...]:
     return tuple(sentences)
 
 
-class StanzaEngine(TokenTaggerEngine):
+class StanzaEngine(SentenceParser):
     def __init__(self, cfg: StanzaConfig):
         self._cfg = cfg
         self._resources: dict[str, Any] | None = None
@@ -169,6 +169,10 @@ class StanzaEngine(TokenTaggerEngine):
             for i, doc in zip(todo, docs):
                 out[i] = convert_document(doc)
         return out
+
+    def sentences(self, text: str, language: str | None) -> tuple[ParsedSentence, ...] | None:
+        parsed = self.parse([text], language)
+        return None if parsed is None else parsed[0]
 
     def tag_tokens(self, text: str, language: str | None) -> list[Token] | None:
         code = self.resolve(language)

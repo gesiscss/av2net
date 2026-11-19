@@ -218,7 +218,7 @@ def test_gliner_votes_count_only_for_a_single_noun_in_the_labelled_stretch():
     categorizer = GlinerConceptCategorizer(gliner, ConceptCategoryConfig())
     wanted = {("polizist", "de"), ("haus", "de"), ("hafen", "de")}
     tallies = tally_votes([_span(), _span(language="en", idx=2)], _FakeTokenTagger(TOKENS),
-                          categorizer, ("NOUN",), wanted)
+                          categorizer, ConceptConfig(), wanted)
     assert gliner.calls == 1   # the English span has no wanted noun (and no model here)
     assert tallies[("polizist", "de")].votes == Counter(role=1)
     assert not tallies[("haus", "de")].votes and tallies[("haus", "de")].occurrences == 1

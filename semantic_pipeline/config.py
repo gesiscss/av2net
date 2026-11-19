@@ -11,6 +11,11 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
 
+# Languages that write noun compounds as one word (German "Klimawandel", not
+# "Klima Wandel"). Text assembly checks such compounds against the lexicon; the
+# concept extractor does not join nouns written apart into terms in them.
+ONE_WORD_COMPOUND_LANGUAGES = ("de", "nl", "sv", "da", "nb", "no", "fi", "is")
+
 
 @dataclass(frozen=True)
 class SpeechConfig:
@@ -154,11 +159,19 @@ class StanzaConfig:
 @dataclass(frozen=True)
 class ConceptConfig:
     """The concept extractor: every common noun in the text, by lemma, with no
-    salience judgment. Proper nouns are left to NER. Categories are not assigned
-    here; Layer 3 takes them from the generated category table."""
+    salience judgment. Proper nouns are left to NER. With the dependency parse,
+    a noun can stand for a term of several words (hyphenated words, noun + noun
+    compounds), and the adjectives that modify it are recorded on its node.
+    Categories are not assigned here; Layer 3 takes them from the generated
+    category table."""
 
     enabled: bool = True
     upos: tuple[str, ...] = ("NOUN",)   # Universal Dependencies tags taken as concepts
+    terms: bool = True                  # join hyphenated words and noun + noun compounds into terms
+    adjectives: bool = True             # record the adjectives that modify a noun on its node
+    # Languages whose nouns written apart are not joined (they write compounds
+    # as one word); hyphenated words are joined in every language.
+    one_word_compound_languages: tuple[str, ...] = ONE_WORD_COMPOUND_LANGUAGES
 
 
 @dataclass(frozen=True)
@@ -239,7 +252,7 @@ class TextConfig:
     # Lexicon (is a reading a real word?), chosen by the video's language.
     lexicon: str = "wordfreq"             # "wordfreq" | "attested" (both channels only)
     lexicon_min_zipf: float = 1.0         # wordfreq Zipf frequency counting as a word
-    compound_languages: tuple[str, ...] = ("de", "nl", "sv", "da", "nb", "no", "fi", "is")
+    compound_languages: tuple[str, ...] = ONE_WORD_COMPOUND_LANGUAGES
     compound_part_min_len: int = 4
     compound_part_min_zipf: float = 2.5
     compound_part_max_zipf: float = 6.0   # function words (sind, der) are no compound parts

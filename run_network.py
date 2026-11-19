@@ -29,7 +29,14 @@ import time
 from collections import Counter
 from pathlib import Path
 
-from run_common import DEFAULT_DATA_DIR, EVENT_FILES, discover_event_dirs, pkg, run_dir
+from run_common import (
+    DEFAULT_DATA_DIR,
+    EVENT_FILES,
+    discover_event_dirs,
+    pkg,
+    run_dir,
+    write_manifest,
+)
 from semantic_pipeline.concept_table import category_lookup, default_table_path, read_table
 from semantic_pipeline.config import Config
 from semantic_pipeline.io import read_jsonl, write_json, write_jsonl
@@ -97,7 +104,7 @@ def _process(rd: Path, config: Config, table: dict, table_info: dict) -> None:
         "config": config.to_dict(),
         "library_versions": {"pydantic": pkg("pydantic")},
     }
-    write_json(rd / "run_manifest.network.json", manifest)
+    write_manifest(rd / "run_manifest.network.json", manifest)
     print(f"Done -> {rd / 'temporal_interactions.jsonl'} , {rd / 'canonical_network.json'}")
 
 

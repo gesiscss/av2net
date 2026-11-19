@@ -2,7 +2,9 @@
 
 For each processed video, reads the text stream from step 0 (text_stream.jsonl,
 see run_text.py) and its parse from step 2 (parse.conllu, see run_parse.py),
-takes every common noun by lemma, and writes into data/<source_id>/:
+takes every common noun by lemma, joins nouns into terms of several words
+(hyphenated words, noun + noun compounds), records the adjectives that modify
+them, and writes into data/<source_id>/:
     semantic_events.concepts.jsonl   SemanticEvent stream (concept events)
     run_manifest.concepts.json       counts, parser and models per language, config, timing
 
@@ -14,7 +16,10 @@ not assigned here: run run_concept_table.py next, then run_network.py. With no
 --source-id, every video under data/ with a text stream is processed in a row.
 
 Usage:
-    python run_concepts.py [--datadir data] [--source-id ID ...]
+    python run_concepts.py [--datadir data] [--source-id ID ...] [--no-terms] [--no-adjectives]
+
+--no-terms keeps every noun as its own node; --no-adjectives records no
+adjectives. With both, the output is the same as before terms existed.
 """
 
 from __future__ import annotations
@@ -23,6 +28,7 @@ import argparse
 import json
 import time
 from collections import Counter
+from dataclasses import replace
 from pathlib import Path
 
 from run_common import (
@@ -34,10 +40,11 @@ from run_common import (
     parse_problem,
     pkg,
     run_dir,
+    write_manifest,
 )
 from semantic_pipeline.concept_table import concept_key
 from semantic_pipeline.config import Config
-from semantic_pipeline.io import read_jsonl, write_json, write_jsonl
+from semantic_pipeline.io import read_jsonl, write_jsonl
 from semantic_pipeline.layer2_extraction.context import TextSpan
 from semantic_pipeline.layer2_extraction.extractors.concepts import EXTRACTOR_NAME
 from semantic_pipeline.layer2_extraction.factory import build_extractors
@@ -113,7 +120,7 @@ def _process(rd: Path, config: Config) -> None:
             "pydantic": pkg("pydantic"),
         },
     }
-    write_json(rd / "run_manifest.concepts.json", manifest)
+    write_manifest(rd / "run_manifest.concepts.json", manifest)
 
     print(f"Done: {n} events, {n_mentions} concept mentions, {len(lemmas)} distinct lemmas "
           f"in {elapsed:.1f}s -> {rd / EVENTS_FILE}")
@@ -124,6 +131,10 @@ def main() -> None:
     ap.add_argument("--datadir", default=DEFAULT_DATA_DIR, help="per-video data root")
     ap.add_argument("--source-id", nargs="*", default=None,
                     help="specific source id(s); default: all with observations")
+    ap.add_argument("--no-terms", action="store_true",
+                    help="keep every noun as its own node (no hyphenated words or compounds)")
+    ap.add_argument("--no-adjectives", action="store_true",
+                    help="do not record the adjectives that modify a noun")
     args = ap.parse_args()
 
     if args.source_id:
@@ -134,6 +145,9 @@ def main() -> None:
         ap.error(f"no processed videos found under {args.datadir}/ (run Layer 1 first)")
 
     config = Config.local_default()
+    concepts = replace(config.extraction.concepts, terms=not args.no_terms,
+                       adjectives=not args.no_adjectives)
+    config = replace(config, extraction=replace(config.extraction, concepts=concepts))
     if not config.extraction.concepts.enabled:
         ap.error("the concept extractor is disabled in the configuration")
     print(f"Processing {len(run_dirs)} video(s); words from {PARSE_FILE} (run_parse.py)")
