@@ -400,6 +400,18 @@ def test_wordfreq_lexicon_with_german_compounds():
     assert build_lexicon("xx", ["a"], ["a"], TextConfig()).name == "attested-in-both-channels"
 
 
+def test_wordfreq_lexicon_without_a_tokenizer_looks_up_whole_words(monkeypatch):
+    pytest.importorskip("wordfreq")
+    from semantic_pipeline.layer2_extraction.text import lexicon
+
+    monkeypatch.setattr(lexicon, "wordfreq_tokenizes", lambda code: False)
+    lx = build_lexicon("de", [], [], TextConfig())
+    assert lx.name == "wordfreq:de:whole-words+attested-in-both-channels"
+    assert lx.is_word("hühner") and not lx.is_word("hüthner")
+    assert lx.is_word("hitzeschäden") and not lx.is_word("sindallerdings")
+    assert build_lexicon("ko", [], [], TextConfig()).is_word("폭염")
+
+
 class _FakeLLM(LLMEngine):
     @property
     def model_id(self) -> str:

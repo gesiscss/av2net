@@ -31,7 +31,7 @@ from ...ontology import ENTITY, NAME_TYPES, TYPE_NAMES, name_type
 from ..context import TextSpan
 from ..interfaces import LLMEngine, SemanticExtractor, SpanTaggerEngine
 from ..memory import EpisodicMemory
-from ..text.lexicon import wordfreq_code
+from ..text.lexicon import wordfreq_code, zipf
 
 EXTRACTOR_NAME = "entities"
 
@@ -45,9 +45,7 @@ def is_function_word(text: str, language: str | None, min_zipf: float) -> bool:
     code = wordfreq_code(language)
     if code is None:
         return False
-    from wordfreq import zipf_frequency
-
-    return zipf_frequency(text.casefold(), code) >= min_zipf
+    return zipf(text.casefold(), code) >= min_zipf
 
 
 def _entity_event(

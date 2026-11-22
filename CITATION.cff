@@ -4,7 +4,7 @@ type: software
 title: "av2net: Multimodal semantic extraction pipeline for videos"
 authors:
   - name: "GESIS - Leibniz Institute for the Social Sciences"
-version: "0.4.1"
+version: "0.4.2"
 license: Apache-2.0
 repository-code: "https://github.com/gesiscss/av2net"
 url: "https://github.com/gesiscss/av2net"

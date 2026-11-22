@@ -15,10 +15,16 @@ are not words. It sits behind one small interface, chosen per video language:
     EitherLexicon     real if any of several lexicons says so
 
 Numbers and other tokens containing digits always count as words.
+
+Word frequencies come from `zipf`, shared by every step that consults the word
+lists. wordfreq tokenizes Chinese, Japanese and Korean with optional packages
+(wordfreq[cjk]). Without them, `zipf` looks up the whole word in the list
+instead: a word with an attached particle (Korean) is then not found.
 """
 
 from __future__ import annotations
 
+import math
 from abc import ABC, abstractmethod
 from functools import lru_cache
 from typing import Iterable
@@ -55,9 +61,6 @@ class AttestedLexicon(Lexicon):
 
 class WordfreqLexicon(Lexicon):
     def __init__(self, language: str, cfg: TextConfig):
-        from wordfreq import zipf_frequency  # imported lazily: optional dependency
-
-        self._zipf = zipf_frequency
         self._lang = language
         self._min = cfg.lexicon_min_zipf
         self._compounds = language in cfg.compound_languages
@@ -68,10 +71,11 @@ class WordfreqLexicon(Lexicon):
 
     @property
     def name(self) -> str:
-        return f"wordfreq:{self._lang}"
+        whole = "" if wordfreq_tokenizes(self._lang) else ":whole-words"
+        return f"wordfreq:{self._lang}{whole}"
 
     def _freq(self, key: str) -> float:
-        return self._zipf(key, self._lang)
+        return zipf(key, self._lang)
 
     def _part(self, key: str) -> bool:
         return self._part_min <= self._freq(key) < self._part_max
@@ -122,6 +126,54 @@ def wordfreq_code(language: str | None) -> str | None:
         return None
     code = _WORDFREQ_CODES.get(language, language.split("-")[0])
     return code if code in available_languages() else None
+
+
+@lru_cache(maxsize=None)
+def wordfreq_tokenizes(code: str) -> bool:
+    """Whether wordfreq can tokenize text in this language (`code` as returned
+    by `wordfreq_code`). Checked once per language with one lookup; if it
+    fails (Chinese, Japanese and Korean need wordfreq[cjk]), a note is printed
+    and `zipf` looks up whole words instead."""
+    from wordfreq import zipf_frequency
+
+    try:
+        zipf_frequency("test", code)
+        return True
+    except Exception as e:  # missing tokenizer package or dictionary
+        print(f"  note  : wordfreq cannot tokenize '{code}' ({type(e).__name__}: {e}); "
+              f"looking up whole words only (install wordfreq[cjk] for Chinese, "
+              f"Japanese and Korean)")
+        return False
+
+
+def wordfreq_mode(language: str | None) -> str:
+    """How the word lists serve `language`, for run manifests: "tokenized",
+    "whole-words" (tokenizer not installed) or "none" (not covered)."""
+    code = wordfreq_code(language)
+    if code is None:
+        return "none"
+    return "tokenized" if wordfreq_tokenizes(code) else "whole-words"
+
+
+def zipf(word: str, code: str) -> float:
+    """Zipf frequency of `word` in wordfreq's list for `code` (0.0 if absent).
+    Uses wordfreq's own lookup if it can tokenize the language, otherwise looks
+    up the whole word after wordfreq's normalization (case folding, Unicode
+    normalization)."""
+    if wordfreq_tokenizes(code):
+        from wordfreq import zipf_frequency
+
+        return zipf_frequency(word, code)
+    return _zipf_whole_word(word, code)
+
+
+@lru_cache(maxsize=100_000)
+def _zipf_whole_word(word: str, code: str) -> float:
+    from wordfreq import get_frequency_dict
+    from wordfreq.preprocess import preprocess_text
+
+    freq = get_frequency_dict(code).get(preprocess_text(word, code), 0.0)
+    return round(math.log10(freq) + 9, 2) if freq > 0 else 0.0
 
 
 def build_lexicon(language: str | None, speech_keys: Iterable[str], ocr_keys: Iterable[str],

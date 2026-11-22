@@ -39,6 +39,7 @@ from semantic_pipeline.layer2_extraction.extractors.entities import EXTRACTOR_NA
 from semantic_pipeline.layer2_extraction.factory import build_extractors
 from semantic_pipeline.layer2_extraction.memory import EpisodicMemory
 from semantic_pipeline.layer2_extraction.pipeline import extract_events
+from semantic_pipeline.layer2_extraction.text.lexicon import wordfreq_mode
 
 
 def _process(rd: Path, config: Config, extractors) -> None:
@@ -74,6 +75,10 @@ def _process(rd: Path, config: Config, extractors) -> None:
         "n_events": n,
         "n_entity_nodes": n_entities,
         "n_entity_nodes_by_type": by_type,
+        # word lists behind the function-word filter, per span language:
+        # "tokenized", "whole-words" (tokenizer not installed) or "none"
+        "word_lists": {lang: wordfreq_mode(lang)
+                       for lang in sorted({s.language for s in spans if s.language})},
         "elapsed_seconds": round(elapsed, 1),
         "config": config.to_dict(),
         "library_versions": {

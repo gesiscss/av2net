@@ -125,6 +125,39 @@ def test_function_words_need_a_language_wordfreq_covers():
     assert not is_function_word("sie", None, 6.0) and not is_function_word("sie", "xx", 6.0)
 
 
+def test_function_words_in_languages_with_optional_tokenizers():
+    # Korean, Chinese and Japanese work with or without wordfreq[cjk] installed
+    pytest.importorskip("wordfreq")
+    assert is_function_word("의", "ko", 6.0) and not is_function_word("폭염", "ko", 6.0)
+    assert is_function_word("的", "zh", 6.0) and not is_function_word("习近平", "zh", 6.0)
+    assert is_function_word("の", "ja", 6.0)
+
+
+def test_whole_word_lookup_matches_wordfreq_for_single_words(monkeypatch):
+    pytest.importorskip("wordfreq")
+    from wordfreq import zipf_frequency
+
+    from semantic_pipeline.layer2_extraction.text import lexicon
+
+    for word in ("sie", "und", "paris", "bundestag"):
+        assert lexicon._zipf_whole_word(word, "de") == zipf_frequency(word, "de")
+    monkeypatch.setattr(lexicon, "wordfreq_tokenizes", lambda code: False)
+    assert is_function_word("SIE", "de", 6.0) and not is_function_word("Paris", "de", 6.0)
+    assert lexicon.wordfreq_mode("de") == "whole-words" and lexicon.wordfreq_mode("xx") == "none"
+
+
+def test_missing_tokenizer_is_noted_not_raised(monkeypatch, capsys):
+    wordfreq = pytest.importorskip("wordfreq")
+    from semantic_pipeline.layer2_extraction.text import lexicon
+
+    def no_tokenizer(*args, **kwargs):
+        raise ModuleNotFoundError("No module named 'MeCab'")
+
+    monkeypatch.setattr(wordfreq, "zipf_frequency", no_tokenizer)
+    assert lexicon.wordfreq_tokenizes.__wrapped__("ko") is False   # bypasses the cache
+    assert "whole words only" in capsys.readouterr().out
+
+
 def test_llm_extractor_normalizes_types_and_keeps_unknown_types_as_other():
     llm = _FakeLLM({"entities": [
         {"text": "Marie Curie", "type": "PERSON"},
