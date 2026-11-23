@@ -77,6 +77,14 @@ def run_dir(datadir: str | Path, source_id: str) -> Path:
     return Path(datadir) / source_id
 
 
+def main_language(rd: Path) -> str | None:
+    """The main spoken language that run_speech recorded in source.json, if any."""
+    src = rd / "source.json"
+    if src.exists():
+        return json.loads(src.read_text(encoding="utf-8")).get("main_language")
+    return None
+
+
 def discover_run_dirs(datadir: str | Path) -> list[Path]:
     """Per-video directories under datadir that already hold observations."""
     base = Path(datadir)

@@ -14,14 +14,16 @@ import pytest
 
 from semantic_pipeline.config import Config, OCRConfig
 from semantic_pipeline.language import (
-    char_script, detect_text_language, languages_by_script, script_share,
+    char_script, detect_text_language, label_languages, languages_by_script, script_share,
+    text_language_probabilities,
 )
 from semantic_pipeline.layer1_observation.factory import build_script_ocr
 from semantic_pipeline.layer1_observation.interfaces import OCREngine
 from semantic_pipeline.layer1_observation.ocr_script import (
     choose_script, decide_script, language_frame_slots,
 )
-from semantic_pipeline.layer1_observation.ocr_stream import _sample_frames
+from semantic_pipeline.layer1_observation import ocr_stream
+from semantic_pipeline.layer1_observation.ocr_stream import _sample_frames, detect_and_build_ocr
 
 CFG = OCRConfig()
 
@@ -64,6 +66,29 @@ def test_language_detection_restricted_to_a_script():
     ru = "Территория инноваций Красноярск"
     assert detect_text_language(ru, languages=languages_by_script()["cyrillic"])[0] == "ru"
     assert detect_text_language("short", languages=("de",)) == (None, 0.0)
+
+
+def test_label_languages_of_a_script_and_of_the_speech():
+    groups = languages_by_script()
+    assert label_languages("cyrillic") == groups["cyrillic"]
+    assert label_languages("cyrillic", "ru") == ("ru",)
+    assert label_languages("cyrillic", "en") == groups["cyrillic"]  # spoken in another script
+    assert set(label_languages("cjk", "zh")) == {"zh-cn", "zh-tw"}  # region part ignored
+    assert label_languages("cjk", "ja") == ("ja",)
+    assert label_languages("hangul", "ko") == ("ko",)
+    assert label_languages("klingon", "ru") == ()
+
+
+def test_short_text_leaves_close_languages_open():
+    # Russian news captions, names only: Bulgarian ranks first, Russian stays listed.
+    news = "Вашингтон, США\nСирия\nОСТИ\nВашингтон, США\nВашингтон, США\nВашингтон, США\nНОВОСТИ\nСирия"
+    ranked = text_language_probabilities(news, languages=languages_by_script()["cyrillic"])
+    assert [lang for lang, _ in ranked] == ["bg", "ru"]
+    assert detect_text_language(news, languages=languages_by_script()["cyrillic"]) == ranked[0]
+    # Traditional Chinese subtitles (no kana) rule Japanese out.
+    zh = "當初二十年前第一次舉辦的時候，還是在一個地方很小的體育館\n今後也請各位多多指教，多謝"
+    assert [lang for lang, _ in text_language_probabilities(zh, languages=languages_by_script()["cjk"])] == ["zh-tw"]
+    assert text_language_probabilities("short") == []
 
 
 # --------------------------------------------------------------------------- #
@@ -188,6 +213,42 @@ def test_sample_frames_flags_the_language_frames(tmp_path):
     assert len(frames) == 15
     assert [j for j, (flag, _) in enumerate(frames) if flag] == [1, 4, 7, 10, 13]
     assert [flag for flag, _ in _sample_frames(path, Config.local_default(), 5)] == [True] * 5
+
+
+class _EveryFrame(_FakeEngine):
+    """The same boxes in every frame."""
+
+    def detect_text_boxes(self, image):
+        return [np.zeros((h, 10, 3), np.uint8) for h in self.boxes]
+
+
+def test_speech_decides_among_the_languages_the_text_leaves_open(tmp_path, monkeypatch):
+    path = str(tmp_path / "v.mp4")
+    writer = cv2.VideoWriter(path, cv2.VideoWriter_fourcc(*"mp4v"), 10, (32, 32))
+    for _ in range(60):
+        writer.write(np.zeros((32, 32, 3), np.uint8))
+    writer.release()
+    cyr = {30: ("Вашингтон, США", 0.9), 20: ("Сирия Новости", 0.9)}
+    engines = {"latin": _EveryFrame("latin", {}, [30, 20]), "cyrillic": _FakeEngine("cyrillic", cyr)}
+    monkeypatch.setattr(ocr_stream, "_script_engines", lambda config: engines)
+    seen = []
+
+    def ranking(text, **kw):  # what langdetect reports for the text, fixed here
+        seen.append((text, kw["languages"]))
+        return [("bg", 0.857), ("ru", 0.143)]
+
+    monkeypatch.setattr(ocr_stream, "text_language_probabilities", ranking)
+    config = Config.local_default()
+    routing = detect_and_build_ocr(path, config, spoken_language="ru")
+    assert (routing.script, routing.language, routing.language_hint) == ("cyrillic", "ru", "ru")
+    assert routing.language_confidence == 0.143
+    assert routing.engine is engines["cyrillic"]
+    assert seen[0][1] == languages_by_script()["cyrillic"]
+    assert set(seen[0][0].split("\n")) == {"Вашингтон, США", "Сирия Новости"}  # script test readings
+    # no speech, speech in another script, or a language the text rules out
+    for spoken in (None, "en", "uk"):
+        routing = detect_and_build_ocr(path, config, spoken_language=spoken)
+        assert (routing.language, routing.language_confidence, routing.language_hint) == ("bg", 0.857, None)
 
 
 def test_script_test_is_skipped_for_latin_only_or_other_backends():

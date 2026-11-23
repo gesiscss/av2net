@@ -17,24 +17,17 @@ Usage:
 from __future__ import annotations
 
 import argparse
-import json
 import time
 from dataclasses import replace
 from pathlib import Path
 
-from run_common import DEFAULT_DATA_DIR, pkg, run_dir, select_videos, source_id_of, write_manifest
+from run_common import (DEFAULT_DATA_DIR, main_language, pkg, run_dir, select_videos, source_id_of,
+                        write_manifest)
 from semantic_pipeline.config import Config
 from semantic_pipeline.io import write_jsonl
 from semantic_pipeline.layer1_observation.factory import build_vision
 from semantic_pipeline.layer1_observation.frames import FrameSampler
 from semantic_pipeline.layer1_observation.vision_stream import detect_shots, stream_vision
-
-
-def _main_language(rd: Path) -> str | None:
-    src = rd / "source.json"
-    if src.exists():
-        return json.loads(src.read_text(encoding="utf-8")).get("main_language")
-    return None
 
 
 def _process(video: str, config: Config, datadir: str, cli_caption_lang: str | None) -> None:
@@ -47,7 +40,7 @@ def _process(video: str, config: Config, datadir: str, cli_caption_lang: str | N
     elif config.vision.caption_language and config.vision.caption_language != "auto":
         caption_lang = config.vision.caption_language
     else:
-        caption_lang = _main_language(rd)
+        caption_lang = main_language(rd)
 
     with FrameSampler(video) as sampler:
         info = sampler.info

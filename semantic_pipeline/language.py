@@ -76,6 +76,19 @@ def languages_by_script() -> dict[str, tuple[str, ...]]:
     return {s: tuple(langs) for s, langs in groups.items()}
 
 
+def label_languages(script: str, spoken: str | None = None) -> tuple[str, ...]:
+    """langdetect's languages of a script; with `spoken`, those of them that are
+    the spoken language, if any (else all of them). Codes are compared without
+    their region part, so a spoken "zh" gives zh-cn and zh-tw."""
+    languages = languages_by_script().get(script, ())
+    if spoken:
+        base = spoken.lower().split("-")[0]
+        same = tuple(lang for lang in languages if lang.split("-")[0] == base)
+        if same:
+            return same
+    return languages
+
+
 LANG_NAMES = {
     "de": "German", "en": "English", "fr": "French", "es": "Spanish",
     "it": "Italian", "pt": "Portuguese", "nl": "Dutch", "pl": "Polish",
@@ -108,16 +121,18 @@ def iso_to_paddle(code: str | None, default: str = "en") -> str:
     return _ISO_REMAP.get(code, code)
 
 
-def detect_text_language(
+def text_language_probabilities(
     text: str, min_chars: int = 12, languages: tuple[str, ...] | None = None
-) -> tuple[str | None, float]:
-    """Detect the dominant language of a text. Returns (iso_code, probability).
+) -> list[tuple[str, float]]:
+    """The languages langdetect still considers for a text, most probable first,
+    as (iso_code, probability); langdetect leaves out those at 0.1 or below.
+    Empty for text shorter than `min_chars` or without usable features.
 
     `languages` restricts the detection to these langdetect codes (for example
     the languages of one script); None considers all languages."""
     text = (text or "").strip()
     if len(text) < min_chars:
-        return None, 0.0
+        return []
     try:
         if languages:
             detector_factory.init_factory()
@@ -128,8 +143,14 @@ def detect_text_language(
         else:
             ranked = detect_langs(text)
     except LangDetectException:
-        return None, 0.0
-    if not ranked:
-        return None, 0.0
-    top = ranked[0]
-    return top.lang, float(top.prob)
+        return []
+    return [(r.lang, float(r.prob)) for r in ranked]
+
+
+def detect_text_language(
+    text: str, min_chars: int = 12, languages: tuple[str, ...] | None = None
+) -> tuple[str | None, float]:
+    """Detect the dominant language of a text. Returns (iso_code, probability),
+    or (None, 0.0); `languages` as in text_language_probabilities."""
+    ranked = text_language_probabilities(text, min_chars, languages)
+    return ranked[0] if ranked else (None, 0.0)

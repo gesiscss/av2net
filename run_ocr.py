@@ -1,7 +1,10 @@
 """Layer 1, step 2 - OCR region-tracking stream.
 
-Chooses the script and detects the language of the on-screen text independently
-of the speech, then tracks distinct text blocks per region over time. Per video
+Chooses the script and detects the language of the on-screen text, then tracks
+distinct text blocks per region over time. The script is chosen from the frames
+alone; for a script other than Latin, the spoken language that run_speech
+recorded in data/<source_id>/source.json decides the language label if the
+text leaves it open (so run run_speech first). Per video
 writes into data/<source_id>/:
     observations.ocr.jsonl     OCRObservation units (region-tracked)
     run_manifest.ocr.json      script and language detection, counts, versions, timing
@@ -19,7 +22,8 @@ import time
 from dataclasses import replace
 from pathlib import Path
 
-from run_common import DEFAULT_DATA_DIR, pkg, run_dir, select_videos, source_id_of, write_manifest
+from run_common import (DEFAULT_DATA_DIR, main_language, pkg, run_dir, select_videos, source_id_of,
+                        write_manifest)
 from semantic_pipeline.config import Config
 from semantic_pipeline.io import write_jsonl
 from semantic_pipeline.layer1_observation.ocr_stream import detect_and_build_ocr, stream_ocr
@@ -35,12 +39,13 @@ def _process(video: str, config: Config, datadir: str) -> None:
 
     t0 = time.time()
     print("Detecting on-screen-text script and language ...")
-    routing = detect_and_build_ocr(video, config)
+    routing = detect_and_build_ocr(video, config, spoken_language=main_language(rd))
     engine, ocr_iso, ocr_prob = routing.engine, routing.language, routing.language_confidence
     if routing.script is not None:
         print(f"  ocr script   : {routing.script} (texts {routing.script_texts}, "
               f"letters {routing.script_letters})")
-    print(f"  ocr language : {ocr_iso} (p={round(ocr_prob, 3) if ocr_prob else ocr_prob}) "
+    hint = f", decided by the spoken language {routing.language_hint}" if routing.language_hint else ""
+    print(f"  ocr language : {ocr_iso} (p={round(ocr_prob, 3) if ocr_prob else ocr_prob}{hint}) "
           f"-> {engine.model_id}")
 
     print("Tracking on-screen text ...")
@@ -55,6 +60,7 @@ def _process(video: str, config: Config, datadir: str) -> None:
         "source_id": source_id,
         "ocr_language_detected": ocr_iso,
         "ocr_language_confidence": round(ocr_prob, 3) if ocr_prob else ocr_prob,
+        "ocr_language_hint": routing.language_hint,
         "ocr_model": engine.model_id,
         "ocr_script": routing.script,
         "ocr_script_texts": routing.script_texts,

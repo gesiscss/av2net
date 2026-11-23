@@ -31,7 +31,7 @@ import cv2
 import numpy as np
 
 from ..config import Config
-from ..language import detect_text_language, languages_by_script
+from ..language import detect_text_language, label_languages, text_language_probabilities
 from ..models.observation import OCRLine, OCRObservation
 from .factory import build_ocr, build_script_ocr
 from .frames import FrameSampler
@@ -177,6 +177,7 @@ class OCRRouting:
     script: str | None = None       # None: no script test (fixed language, Latin only, backend)
     script_texts: dict[str, int] = field(default_factory=dict)
     script_letters: int | None = None
+    language_hint: str | None = None  # spoken language, if it decided the label
 
 
 _SCRIPT_ENGINES: dict = {}  # OCRConfig -> script engines, loaded once per run
@@ -208,14 +209,17 @@ def _sample_frames(video_path: str, config: Config, n: int) -> list[tuple[bool, 
     return out
 
 
-def detect_and_build_ocr(video_path: str, config: Config) -> OCRRouting:
-    """Independently detect the on-screen-text language and build the OCR engine.
+def detect_and_build_ocr(video_path: str, config: Config,
+                         spoken_language: str | None = None) -> OCRRouting:
+    """Detect the on-screen-text script and language and build the OCR engine.
 
     First the script (see ocr_script.py). Latin or undetermined: the Latin model
     reads the 5 language frames, the language is detected from that text, and
     the engine for that language is built. Another script: that script's model
     reads the video, and the language is detected among the languages of the
-    script from its readings in the script test; it only labels the text.
+    script from its readings in the script test; it only labels the text. If
+    `spoken_language` (the video's main spoken language, if known) is one of
+    the languages langdetect still considers for that text, it is the label.
     """
     ocr_cfg = config.ocr
     if ocr_cfg.language and ocr_cfg.language != "auto":
@@ -225,9 +229,18 @@ def detect_and_build_ocr(video_path: str, config: Config) -> OCRRouting:
     frames = _sample_frames(video_path, config, ocr_cfg.script_frames if engines else LANGUAGE_FRAMES)
     choice = choose_script(frames, engines, ocr_cfg) if engines else None
 
+    hint = None
     if choice is not None and choice.script not in (LATIN, UNDETERMINED):
-        iso, prob = detect_text_language(
-            "\n".join(choice.lines), languages=languages_by_script().get(choice.script))
+        script_languages = label_languages(choice.script)
+        ranked = text_language_probabilities("\n".join(choice.lines), languages=script_languages)
+        iso, prob = ranked[0] if ranked else (None, 0.0)
+        spoken = label_languages(choice.script, spoken_language)
+        if spoken != script_languages:
+            # Short on-screen text, often names, rarely tells close languages of
+            # one script apart; the speech decides among those the text leaves open.
+            heard = [(lang, p) for lang, p in ranked if lang in spoken]
+            if heard:
+                (iso, prob), hint = heard[0], spoken_language
         engine = engines[choice.script]
     else:
         reader = engines[LATIN] if engines else build_ocr(config, None)  # backend default model
@@ -237,7 +250,7 @@ def detect_and_build_ocr(video_path: str, config: Config) -> OCRRouting:
         engine = build_ocr(config, iso)
     if choice is None:
         return OCRRouting(engine, iso, prob)
-    return OCRRouting(engine, iso, prob, choice.script, choice.texts, choice.letters)
+    return OCRRouting(engine, iso, prob, choice.script, choice.texts, choice.letters, hint)
 
 
 # --------------------------------------------------------------------------- #
