@@ -5,7 +5,9 @@ CPU (about one to two seconds per frame).
 
 Language-agnostic: the detected language (ISO code) is routed to the matching
 recognition script family (LATIN, CYRILLIC, ARABIC, DEVANAGARI, JAPAN, KOREAN,
-CH, ...). German routes through LATIN and reads umlauts correctly.
+CH, ...). German routes through LATIN and reads umlauts correctly. For choosing
+the script of a video, one recognition model per script is built by script name
+(`SCRIPT_MODELS`); all share the same script-independent text detector.
 """
 
 from __future__ import annotations
@@ -33,7 +35,17 @@ _ISO_TO_LANGREC = {
     "ar": LangRec.ARABIC, "fa": LangRec.ARABIC, "ur": LangRec.ARABIC,
     "hi": LangRec.DEVANAGARI, "mr": LangRec.DEVANAGARI, "ne": LangRec.DEVANAGARI,
     "el": LangRec.EL, "th": LangRec.TH, "te": LangRec.TE, "ta": LangRec.TA,
-    "ka": LangRec.KA,
+    "kn": LangRec.KA,  # RapidOCR's "ka" model is Kannada; there is no Georgian model
+    "mk": LangRec.CYRILLIC,
+}
+
+# Script name (see semantic_pipeline.language.char_script) -> recognition model.
+# CH (PP-OCRv5) reads simplified and traditional Chinese characters and kana.
+SCRIPT_MODELS = {
+    "latin": LangRec.LATIN, "cjk": LangRec.CH, "hangul": LangRec.KOREAN,
+    "arabic": LangRec.ARABIC, "cyrillic": LangRec.CYRILLIC,
+    "devanagari": LangRec.DEVANAGARI, "greek": LangRec.EL, "thai": LangRec.TH,
+    "tamil": LangRec.TA, "telugu": LangRec.TE, "kannada": LangRec.KA,
 }
 
 
@@ -44,9 +56,10 @@ def _iso_to_langrec(iso: str | None) -> LangRec:
 
 
 class RapidOcrOnnxEngine(OCREngine):
-    def __init__(self, cfg: OCRConfig, language: str | None):
+    def __init__(self, cfg: OCRConfig, language: str | None, script: str | None = None):
+        """The model for `language` (ISO code), or for `script` if given."""
         self._cfg = cfg
-        self._lang_rec = _iso_to_langrec(language)
+        self._lang_rec = SCRIPT_MODELS[script] if script else _iso_to_langrec(language)
         try:
             self._version = version("rapidocr")
         except PackageNotFoundError:
@@ -105,3 +118,18 @@ class RapidOcrOnnxEngine(OCREngine):
                 bbox = (int(x1), int(y1), int(x2), int(y2))
             lines.append(OCRLine(text=text, confidence=score, bbox=bbox))
         return lines
+
+    def detect_text_boxes(self, image: np.ndarray) -> list[np.ndarray]:
+        img, op_record = self._engine.preprocess_img(self._engine.load_img(image))
+        try:
+            crops, _ = self._engine.detect_and_crop(img, op_record)
+        except Exception:  # RapidOCR raises when a frame has no text box
+            return []
+        return list(crops)
+
+    def recognize(self, crops: list[np.ndarray]) -> list[tuple[str, float]]:
+        if not crops:
+            return []
+        result = self._engine.recognize_txt(crops)
+        out = [(str(t), round(float(s), 3)) for t, s in zip(result.txts or [], result.scores or [])]
+        return out + [("", 0.0)] * (len(crops) - len(out))

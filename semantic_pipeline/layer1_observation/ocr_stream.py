@@ -31,13 +31,13 @@ import cv2
 import numpy as np
 
 from ..config import Config
-from ..language import detect_text_language
+from ..language import detect_text_language, languages_by_script
 from ..models.observation import OCRLine, OCRObservation
-from .factory import build_ocr
+from .factory import build_ocr, build_script_ocr
 from .frames import FrameSampler
 from .interfaces import OCREngine
+from .ocr_script import LANGUAGE_FRAMES, LATIN, UNDETERMINED, choose_script, language_frame_slots
 
-_N_BOOTSTRAP_FRAMES = 5
 _SIG_SIZE = (128, 128)  # downscaled grayscale size for the change gate
 
 
@@ -167,35 +167,77 @@ def _emit(track: _Track, source_id: str, model_id: str) -> OCRObservation:
 # --------------------------------------------------------------------------- #
 # OCR language detection (independent of speech)
 # --------------------------------------------------------------------------- #
-def detect_and_build_ocr(
-    video_path: str, config: Config
-) -> tuple[OCREngine, str | None, float]:
-    """Independently detect the on-screen-text language and build the OCR engine.
+@dataclass(frozen=True)
+class OCRRouting:
+    """The engine that reads a video, and how it was chosen."""
 
-    Reads a few frames with the backend's default model, detects the language of
-    that text, then builds the engine routed to the detected language.
-    """
-    ocr_cfg = config.ocr
-    if ocr_cfg.language and ocr_cfg.language != "auto":
-        return build_ocr(config, ocr_cfg.language), ocr_cfg.language, 1.0
+    engine: OCREngine
+    language: str | None
+    language_confidence: float
+    script: str | None = None       # None: no script test (fixed language, Latin only, backend)
+    script_texts: dict[str, int] = field(default_factory=dict)
+    script_letters: int | None = None
 
-    bootstrap = build_ocr(config, None)  # backend default model, just to read text
-    texts: list[str] = []
+
+_SCRIPT_ENGINES: dict = {}  # OCRConfig -> script engines, loaded once per run
+
+
+def _script_engines(config: Config) -> dict[str, OCREngine] | None:
+    if config.ocr not in _SCRIPT_ENGINES:
+        _SCRIPT_ENGINES[config.ocr] = build_script_ocr(config)
+    return _SCRIPT_ENGINES[config.ocr]
+
+
+def _sample_frames(video_path: str, config: Config, n: int) -> list[tuple[bool, np.ndarray]]:
+    """`n` frames at (j + 0.5) / n of the (capped) video, flagged if they are one of
+    the 5 language frames (at (k + 0.5) / 5)."""
+    slots = language_frame_slots(n)
+    out: list[tuple[bool, np.ndarray]] = []
     with FrameSampler(video_path) as sampler:
         duration = sampler.info.duration_s
         cap = config.observation.max_duration_s
         end_s = duration if cap is None else min(duration, cap)
-        for k in range(_N_BOOTSTRAP_FRAMES):
-            t = end_s * (k + 0.5) / _N_BOOTSTRAP_FRAMES
+        for j in range(n):
+            k = slots.get(j)
+            t = end_s * (k + 0.5) / LANGUAGE_FRAMES if k is not None else end_s * (j + 0.5) / n
             if duration > 0:
                 t = min(t, duration - 1e-3)
             frame = sampler.at(t)
             if frame is not None:
-                texts.extend(line.text for line in bootstrap.read(frame))
+                out.append((k is not None, frame))
+    return out
 
-    iso, prob = detect_text_language("\n".join(texts))
-    engine = build_ocr(config, iso)
-    return engine, iso, prob
+
+def detect_and_build_ocr(video_path: str, config: Config) -> OCRRouting:
+    """Independently detect the on-screen-text language and build the OCR engine.
+
+    First the script (see ocr_script.py). Latin or undetermined: the Latin model
+    reads the 5 language frames, the language is detected from that text, and
+    the engine for that language is built. Another script: that script's model
+    reads the video, and the language is detected among the languages of the
+    script from its readings in the script test; it only labels the text.
+    """
+    ocr_cfg = config.ocr
+    if ocr_cfg.language and ocr_cfg.language != "auto":
+        return OCRRouting(build_ocr(config, ocr_cfg.language), ocr_cfg.language, 1.0)
+
+    engines = _script_engines(config)
+    frames = _sample_frames(video_path, config, ocr_cfg.script_frames if engines else LANGUAGE_FRAMES)
+    choice = choose_script(frames, engines, ocr_cfg) if engines else None
+
+    if choice is not None and choice.script not in (LATIN, UNDETERMINED):
+        iso, prob = detect_text_language(
+            "\n".join(choice.lines), languages=languages_by_script().get(choice.script))
+        engine = engines[choice.script]
+    else:
+        reader = engines[LATIN] if engines else build_ocr(config, None)  # backend default model
+        texts = [line.text for is_language_frame, frame in frames if is_language_frame
+                 for line in reader.read(frame)]
+        iso, prob = detect_text_language("\n".join(texts))
+        engine = build_ocr(config, iso)
+    if choice is None:
+        return OCRRouting(engine, iso, prob)
+    return OCRRouting(engine, iso, prob, choice.script, choice.texts, choice.letters)
 
 
 # --------------------------------------------------------------------------- #

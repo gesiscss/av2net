@@ -1,9 +1,10 @@
 """Layer 1, step 2 - OCR region-tracking stream.
 
-Detects the on-screen-text language independently, then tracks distinct text
-blocks per region over time. Per video writes into data/<source_id>/:
+Chooses the script and detects the language of the on-screen text independently
+of the speech, then tracks distinct text blocks per region over time. Per video
+writes into data/<source_id>/:
     observations.ocr.jsonl     OCRObservation units (region-tracked)
-    run_manifest.ocr.json      detection, counts, versions, timing
+    run_manifest.ocr.json      script and language detection, counts, versions, timing
 
 With no VIDEO argument, every MP4 under input/ is processed in a row.
 
@@ -33,8 +34,12 @@ def _process(video: str, config: Config, datadir: str) -> None:
     print(f"  cap      : {config.observation.max_duration_s or 'full video'}")
 
     t0 = time.time()
-    print("Detecting on-screen-text language ...")
-    engine, ocr_iso, ocr_prob = detect_and_build_ocr(video, config)
+    print("Detecting on-screen-text script and language ...")
+    routing = detect_and_build_ocr(video, config)
+    engine, ocr_iso, ocr_prob = routing.engine, routing.language, routing.language_confidence
+    if routing.script is not None:
+        print(f"  ocr script   : {routing.script} (texts {routing.script_texts}, "
+              f"letters {routing.script_letters})")
     print(f"  ocr language : {ocr_iso} (p={round(ocr_prob, 3) if ocr_prob else ocr_prob}) "
           f"-> {engine.model_id}")
 
@@ -51,6 +56,9 @@ def _process(video: str, config: Config, datadir: str) -> None:
         "ocr_language_detected": ocr_iso,
         "ocr_language_confidence": round(ocr_prob, 3) if ocr_prob else ocr_prob,
         "ocr_model": engine.model_id,
+        "ocr_script": routing.script,
+        "ocr_script_texts": routing.script_texts,
+        "ocr_script_letters": routing.script_letters,
         "n_units": n,
         "elapsed_seconds": round(elapsed, 1),
         "config": config.to_dict(),

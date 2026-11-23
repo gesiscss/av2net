@@ -32,6 +32,18 @@ class OCRConfig:
     backend: str = "rapidocr-onnx"  # onnxruntime; fast on CPU, language-routed
     min_confidence: float = 0.5     # drop OCR lines below this score
     language: str = "auto"          # "auto" = detect from the frames; else an ISO code
+    # Choosing the script (writing system) before the language, for language "auto".
+    # Only "latin" listed = no script test (the language is detected from the Latin reading).
+    scripts: tuple[str, ...] = (
+        "latin", "cjk", "hangul", "arabic", "cyrillic", "devanagari",
+        "greek", "thai", "tamil", "telugu", "kannada",
+    )
+    script_frames: int = 15         # frames for the script test; an odd multiple of 5
+    script_max_boxes: int = 30      # largest boxes read from the 5 language frames, and from the others
+    script_min_confidence: float = 0.7  # a script model claims a box at this confidence or more,
+    script_min_share: float = 0.8   # ... with this share of its letters in its own script
+    script_min_texts: int = 2       # distinct texts a script needs to win
+    script_min_letters: int = 20    # fewer letters read -> "undetermined" (Latin path)
     # Region-tracking stream parameters:
     sample_dt: float = 0.5          # seconds between change-gate samples
     change_threshold: float = 4.0   # mean abs frame diff (0-255) to trigger re-OCR

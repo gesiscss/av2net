@@ -41,6 +41,15 @@ class OCREngine(ABC):
     def read(self, image: np.ndarray) -> list[OCRLine]:
         """Return detected text lines for one frame (BGR ndarray)."""
 
+    # Optional, for choosing the script (backends without it skip that test):
+    def detect_text_boxes(self, image: np.ndarray) -> list[np.ndarray]:
+        """Image crops of the text boxes found in one frame (detection only)."""
+        raise NotImplementedError
+
+    def recognize(self, crops: list[np.ndarray]) -> list[tuple[str, float]]:
+        """Text and confidence for each crop (recognition only, no score filter)."""
+        raise NotImplementedError
+
 
 class VisionInterpreter(ABC):
     """Produces a natural-language interpretation of a single image."""

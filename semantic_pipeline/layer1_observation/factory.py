@@ -36,6 +36,26 @@ def build_ocr(config: Config, language: str | None = None) -> OCREngine:
     raise ValueError(f"Unknown OCR backend: {backend!r}")
 
 
+def build_script_ocr(config: Config) -> dict[str, OCREngine] | None:
+    """One OCR engine per script in `config.ocr.scripts` (Latin always included),
+    for choosing the script of a video. None if no script besides Latin is listed
+    or the backend cannot test scripts (then the language is detected from the
+    Latin model's reading alone)."""
+    scripts = ("latin",) + tuple(s for s in config.ocr.scripts if s != "latin")
+    if len(scripts) == 1:
+        return None
+    backend = config.ocr.backend
+    if backend == "rapidocr-onnx":
+        from .ocr_rapidocr_onnx import SCRIPT_MODELS, RapidOcrOnnxEngine
+
+        unknown = [s for s in scripts if s not in SCRIPT_MODELS]
+        if unknown:
+            raise ValueError(f"No {backend} model for script(s) {unknown}; "
+                             f"available: {sorted(SCRIPT_MODELS)}")
+        return {s: RapidOcrOnnxEngine(config.ocr, None, script=s) for s in scripts}
+    return None
+
+
 def build_vision(config: Config, caption_language: str | None = None) -> VisionInterpreter:
     backend = config.vision.backend
     if backend == "ollama":
